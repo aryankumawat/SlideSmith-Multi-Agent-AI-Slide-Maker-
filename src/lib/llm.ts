@@ -92,30 +92,60 @@ export class LLMClient {
   }
 
   private async callOllama(prompt: string, baseUrl: string, model: string): Promise<LLMResponse> {
-    const response = await fetch(`${baseUrl}/api/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: false,
-        options: {
-          temperature: 0.7,
-          num_predict: 4000,
+    try {
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+      
+      const response = await fetch(`${baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      }),
-    });
+        body: JSON.stringify({
+          model,
+          prompt,
+          stream: false,
+          options: {
+            temperature: 0.7,
+            num_predict: 4000,
+          },
+        }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`Model "${model}" not found. Please ensure the model is installed in Ollama. Run: ollama pull ${model}`);
+        }
+        if (response.status === 0 || response.status >= 500) {
+          throw new Error(`Cannot connect to Ollama at ${baseUrl}. Please ensure Ollama is running.`);
+        }
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (!data.response) {
+        throw new Error('Invalid response from Ollama: missing response field');
+      }
+      return {
+        content: data.response,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        // Check for network errors
+        if (error.name === 'AbortError') {
+          throw new Error(`Request to Ollama timed out after 2 minutes. The model may be slow or unavailable.`);
+        }
+        if (error.message.includes('fetch') || error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch')) {
+          throw new Error(`Cannot connect to Ollama at ${baseUrl}. Please ensure Ollama is running and accessible.`);
+        }
+        throw error;
+      }
+      throw new Error('Unknown error occurred while calling Ollama');
     }
-
-    const data = await response.json();
-    return {
-      content: data.response,
-    };
   }
 
   private async callDemo(prompt: string): Promise<LLMResponse> {

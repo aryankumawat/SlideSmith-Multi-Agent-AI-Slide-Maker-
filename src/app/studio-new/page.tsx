@@ -33,23 +33,45 @@ export default function StudioNewPage() {
     setError(null);
     
     try {
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
+      
       const response = await fetch('/api/generate-deck', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate presentation');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        const errorMessage = errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
+      if (!result.deck) {
+        throw new Error('Invalid response: deck not found in response');
+      }
       setGeneratedDeck(result.deck);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Generation error:', err);
+      let errorMessage = 'An error occurred';
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          errorMessage = 'Request timed out. The generation is taking too long. Please try again or check if your LLM service is running.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -201,7 +223,20 @@ export default function StudioNewPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto py-8">
         {!generatedDeck ? (
-          <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
+          <div className="space-y-4">
+            {error && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="pt-6">
+                  <p className="text-red-600 font-medium">Error: {error}</p>
+                  <p className="text-sm text-red-500 mt-2">
+                    {error.includes('Ollama') && 'Make sure Ollama is running: `ollama serve` or check your LLM configuration.'}
+                    {error.includes('timeout') && 'The request took too long. Try reducing the slide count or check your LLM service.'}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
+          </div>
         ) : (
           <div className="space-y-6">
             {/* Header */}
@@ -248,7 +283,7 @@ export default function StudioNewPage() {
                   });
                 };
 
-                // Get theme-based styling
+                // Get theme-based styling with better contrast for headings
                 const getThemeClasses = () => {
                   const theme = generatedDeck.theme;
                   switch (theme) {
@@ -256,31 +291,31 @@ export default function StudioNewPage() {
                       return {
                         card: 'bg-gradient-to-br from-slate-900 to-blue-900 border-blue-500',
                         header: 'bg-gradient-to-r from-blue-600 to-purple-600',
-                        accent: 'text-cyan-400'
+                        accent: 'text-white' // White for dark backgrounds
                       };
                     case 'ultra_violet':
                       return {
                         card: 'bg-gradient-to-br from-purple-900 to-pink-900 border-purple-500',
                         header: 'bg-gradient-to-r from-purple-600 to-fuchsia-600',
-                        accent: 'text-fuchsia-400'
+                        accent: 'text-white' // White for dark backgrounds
                       };
                     case 'minimal':
                       return {
                         card: 'bg-white border-gray-300',
                         header: 'bg-gray-100',
-                        accent: 'text-gray-700'
+                        accent: 'text-gray-900' // Dark for light backgrounds
                       };
                     case 'corporate':
                       return {
                         card: 'bg-gradient-to-br from-slate-50 to-blue-50 border-blue-300',
                         header: 'bg-gradient-to-r from-blue-500 to-indigo-500',
-                        accent: 'text-blue-600'
+                        accent: 'text-white' // White for colored headers
                       };
                     default:
                       return {
                         card: 'bg-white border-gray-200',
                         header: 'bg-gradient-to-r from-blue-50 to-purple-50',
-                        accent: 'text-blue-600'
+                        accent: 'text-gray-900' // Dark for light backgrounds
                       };
                   }
                 };
@@ -323,22 +358,6 @@ export default function StudioNewPage() {
                         {/* Chart visualization */}
                         {slide.chart_spec && (
                           <ChartDisplay chartSpec={slide.chart_spec} className="mt-3" />
-                        )}
-                        
-                        {/* Speaker notes preview */}
-                        {slide.notes && (
-                          <div className="mt-3 p-2 bg-amber-50 rounded text-xs border border-amber-200">
-                            <div className="flex items-start gap-1">
-                              <span className="text-base">💬</span>
-                              <div className="flex-1">
-                                <strong className="text-amber-700">Notes:</strong>{' '}
-                                <span className="text-gray-600">
-                                  {slide.notes.substring(0, 120)}
-                                  {slide.notes.length > 120 && '...'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
                         )}
                       </div>
                     </CardContent>

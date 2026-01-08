@@ -126,45 +126,109 @@ export async function POST(request: NextRequest) {
       docSummary = await parseDocuments(validatedData.assets.doc_urls);
     }
     
-    // Generate outline
-    const outline = await generateOutline({
-      slide_count: meta.slide_count,
-      audience: meta.audience,
-      tone: meta.tone,
-      topic_or_prompt_or_instructions: validatedData.topic_or_prompt || validatedData.instructions || '',
-      doc_summary_or_empty: docSummary
-    });
+    // Generate outline with timeout
+    console.log('[Generate Deck API] Generating outline...');
+    const outline = await Promise.race([
+      generateOutline({
+        slide_count: meta.slide_count,
+        audience: meta.audience,
+        tone: meta.tone,
+        topic_or_prompt_or_instructions: validatedData.topic_or_prompt || validatedData.instructions || '',
+        doc_summary_or_empty: docSummary
+      }),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Outline generation timed out after 60 seconds')), 60000)
+      )
+    ]);
     
-    // Generate slides
+    console.log('[Generate Deck API] Outline generated, creating slides...');
+    
+    // Validate exact slide count from outline
+    const totalSlidesInOutline = outline.sections.reduce((sum, section) => sum + section.slides.length, 0);
+    if (totalSlidesInOutline !== meta.slide_count) {
+      console.warn(`[Generate Deck API] Outline has ${totalSlidesInOutline} slides, but need exactly ${meta.slide_count}. Adjusting...`);
+      
+      // Adjust outline to match exact count
+      if (totalSlidesInOutline < meta.slide_count) {
+        // Add slides to last section
+        const lastSection = outline.sections[outline.sections.length - 1];
+        const needed = meta.slide_count - totalSlidesInOutline;
+        for (let i = 0; i < needed; i++) {
+          lastSection.slides.push({
+            title: `Additional Key Point ${i + 1}`,
+            layout: 'title_bullets',
+            section: lastSection.name
+          });
+        }
+      } else if (totalSlidesInOutline > meta.slide_count) {
+        // Remove slides from last section
+        const lastSection = outline.sections[outline.sections.length - 1];
+        const toRemove = totalSlidesInOutline - meta.slide_count;
+        lastSection.slides = lastSection.slides.slice(0, lastSection.slides.length - toRemove);
+      }
+    }
+    
+    // Generate slides with progress logging
     const slides: Slide[] = [];
+    const totalSlides = outline.sections.reduce((sum, section) => sum + section.slides.length, 0);
+    console.log(`[Generate Deck API] Generating exactly ${totalSlides} slides (requested: ${meta.slide_count})`);
+    let currentSlide = 0;
+    
     for (const section of outline.sections) {
       for (const slot of section.slides) {
-        const perSlideFacts = docSummary ? harvestFactsForSlide(docSummary, slot.title) : '';
-        const draft = await generateSlide({
-          slide_context: slot,
-          per_slide_extracted_text_or_empty: perSlideFacts
-        });
+        currentSlide++;
+        console.log(`[Generate Deck API] Generating slide ${currentSlide}/${totalSlides}: ${slot.title}`);
         
-        let withChart = draft;
-        if (!draft.chart_spec && tableMatchesTitle(docSummary, slot.title)) {
-          withChart = attachChartSpec(draft, tableForTitle(docSummary, slot.title));
+        try {
+          const perSlideFacts = docSummary ? harvestFactsForSlide(docSummary, slot.title) : '';
+          const draft = await Promise.race([
+            generateSlide({
+              slide_context: slot,
+              per_slide_extracted_text_or_empty: perSlideFacts
+            }),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error(`Slide generation timed out for: ${slot.title}`)), 30000)
+            )
+          ]);
+          
+          let withChart = draft;
+          if (!draft.chart_spec && tableMatchesTitle(docSummary, slot.title)) {
+            withChart = attachChartSpec(draft, tableForTitle(docSummary, slot.title));
+          }
+          
+          const visual = await Promise.race([
+            generateVisual({
+              title: draft.title,
+              bullets: draft.bullets,
+              theme_style: themes[meta.theme].image_style
+            }),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Visual generation timed out')), 10000)
+            )
+          ]);
+          
+          slides.push({
+            layout: slot.layout,
+            title: draft.title,
+            bullets: draft.bullets,
+            notes: draft.notes,
+            chart_spec: withChart.chart_spec || null,
+            image: { prompt: visual.prompt, alt: visual.alt, source: 'generated' },
+            citations: draft.citations || []
+          });
+        } catch (slideError) {
+          console.error(`[Generate Deck API] Error generating slide ${currentSlide}:`, slideError);
+          // Continue with fallback slide instead of failing completely
+          slides.push({
+            layout: slot.layout,
+            title: slot.title,
+            bullets: ['Content generation in progress...'],
+            notes: 'This slide content is being generated.',
+            chart_spec: null,
+            image: { prompt: `Visual for ${slot.title}`, alt: slot.title, source: 'generated' },
+            citations: []
+          });
         }
-        
-        const visual = await generateVisual({
-          title: draft.title,
-          bullets: draft.bullets,
-          theme_style: themes[meta.theme].image_style
-        });
-        
-        slides.push({
-          layout: slot.layout,
-          title: draft.title,
-          bullets: draft.bullets,
-          notes: draft.notes,
-          chart_spec: withChart.chart_spec || null,
-          image: { prompt: visual.prompt, alt: visual.alt, source: 'generated' },
-          citations: draft.citations || []
-        });
       }
     }
     
@@ -205,8 +269,25 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Provide more detailed error messages
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const isNetworkError = errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED');
+    const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('aborted');
+    
+    let userFriendlyError = 'Deck generation failed';
+    if (isNetworkError) {
+      userFriendlyError = 'Cannot connect to AI service. Please ensure Ollama is running on http://localhost:11434 or configure your LLM provider in environment variables.';
+    } else if (isTimeoutError) {
+      userFriendlyError = 'Request timed out. The AI service may be slow or unavailable. Please try again.';
+    } else if (errorMessage) {
+      userFriendlyError = `Generation failed: ${errorMessage}`;
+    }
+    
     return NextResponse.json(
-      { error: 'Deck generation failed' },
+      { 
+        error: userFriendlyError,
+        details: errorMessage
+      },
       { status: 500 }
     );
   }

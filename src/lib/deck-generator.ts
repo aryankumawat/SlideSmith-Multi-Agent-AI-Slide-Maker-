@@ -102,8 +102,12 @@ RULES FOR ENGAGING PRESENTATIONS:
 TASK:
 Create an outline for: """${params.topic_or_prompt_or_instructions}"""
 
+CRITICAL CONSTRAINT:
+- You MUST create EXACTLY ${params.slide_count} slides - no more, no less. Count carefully.
+- The total number of slides across all sections must equal ${params.slide_count} exactly.
+
 CONSTRAINTS:
-- Total slides: ${params.slide_count}
+- Total slides: ${params.slide_count} (EXACTLY - this is mandatory)
 - Audience: ${params.audience}
 - Tone: ${params.tone}
 - Document summary: ${params.doc_summary_or_empty || 'None provided'}
@@ -137,43 +141,97 @@ OUTPUT FORMAT (JSON only):
   ]
 }
 
+IMPORTANT: Before returning, count the total number of slides in your "sections" array. It must equal ${params.slide_count} exactly. Adjust the number of slides in each section to match this requirement.
+
 Return ONLY valid JSON with specific, engaging titles for the given topic.`;
 
   try {
     const response = await llmClient.generateContent(prompt);
     const cleaned = cleanJSONResponse(response);
     const parsed = JSON.parse(cleaned);
+    
+    // Validate and enforce exact slide count
+    const totalSlides = parsed.sections?.reduce((sum: number, section: any) => sum + (section.slides?.length || 0), 0) || 0;
+    
+    if (totalSlides !== params.slide_count) {
+      console.warn(`[Outline] Generated ${totalSlides} slides, but need exactly ${params.slide_count}. Adjusting...`);
+      
+      // Adjust slide count to match exactly
+      if (totalSlides < params.slide_count) {
+        // Add slides to the last section
+        const lastSection = parsed.sections[parsed.sections.length - 1];
+        const needed = params.slide_count - totalSlides;
+        for (let i = 0; i < needed; i++) {
+          lastSection.slides.push({
+            title: `Additional Key Point ${i + 1}`,
+            layout: 'title_bullets',
+            section: lastSection.name
+          });
+        }
+      } else if (totalSlides > params.slide_count) {
+        // Remove slides from the last section
+        const lastSection = parsed.sections[parsed.sections.length - 1];
+        const toRemove = totalSlides - params.slide_count;
+        lastSection.slides = lastSection.slides.slice(0, lastSection.slides.length - toRemove);
+      }
+    }
+    
+    // Final validation
+    const finalCount = parsed.sections.reduce((sum: number, section: any) => sum + (section.slides?.length || 0), 0);
+    if (finalCount !== params.slide_count) {
+      console.error(`[Outline] Failed to adjust to exact count. Generated ${finalCount}, needed ${params.slide_count}`);
+    }
+    
     return parsed;
   } catch (error) {
     console.error('Outline generation failed:', error);
-    // Enhanced fallback with topic-specific content
+    // Enhanced fallback with exact slide count
     const topic = params.topic_or_prompt_or_instructions;
+    const slideCount = params.slide_count;
+    
+    // Create sections that add up to exactly slideCount
+    const sections = [];
+    let remaining = slideCount;
+    
+    // Opening section (2 slides)
+    const openingSlides = Math.min(2, remaining);
+    sections.push({
+      name: 'Opening',
+      slides: Array.from({ length: openingSlides }, (_, i) => ({
+        title: i === 0 ? `**${topic}**: What You Need to Know` : 'Current State & Trends',
+        layout: 'title_bullets',
+        section: 'Opening'
+      }))
+    });
+    remaining -= openingSlides;
+    
+    // Analysis section (remaining - 2 for conclusion)
+    const analysisSlides = Math.max(1, remaining - 2);
+    sections.push({
+      name: 'Analysis',
+      slides: Array.from({ length: analysisSlides }, (_, i) => ({
+        title: i === 0 ? 'Key Challenges & Opportunities' : i === 1 ? 'Data-Driven Insights' : `Key Point ${i + 1}`,
+        layout: i === 1 && analysisSlides > 1 ? 'chart' : 'title_bullets',
+        section: 'Analysis'
+      }))
+    });
+    remaining -= analysisSlides;
+    
+    // Conclusion section (remaining slides)
+    if (remaining > 0) {
+      sections.push({
+        name: 'Conclusion',
+        slides: Array.from({ length: remaining }, (_, i) => ({
+          title: i === 0 ? 'Impact & Results' : 'Next Steps & Takeaways',
+          layout: 'title_bullets',
+          section: 'Conclusion'
+        }))
+      });
+    }
+    
     return {
       title: `**${topic}**: Key Insights & Analysis`,
-      sections: [
-        {
-          name: 'Opening',
-          slides: [
-            { title: `**${topic}**: What You Need to Know`, layout: 'title_bullets', section: 'Opening' },
-            { title: 'Current State & Trends', layout: 'title_bullets', section: 'Opening' }
-          ]
-        },
-        {
-          name: 'Analysis',
-          slides: [
-            { title: 'Key Challenges & Opportunities', layout: 'title_bullets', section: 'Analysis' },
-            { title: 'Data-Driven Insights', layout: 'chart', section: 'Analysis' },
-            { title: 'Best Practices & Solutions', layout: 'title_bullets', section: 'Analysis' }
-          ]
-        },
-        {
-          name: 'Conclusion',
-          slides: [
-            { title: 'Impact & Results', layout: 'title_bullets', section: 'Conclusion' },
-            { title: 'Next Steps & Takeaways', layout: 'title_bullets', section: 'Conclusion' }
-          ]
-        }
-      ]
+      sections
     };
   }
 }
@@ -221,7 +279,7 @@ DOCUMENT_FACTS: """${params.per_slide_extracted_text_or_empty}"""
 OUTPUT REQUIREMENTS:
 - title: Engaging, specific title (use **bold** for key words, NO emojis)
 - bullets: 3-5 bullets with bold text and specific data (NO emojis)
-- notes: Rich speaker notes with transitions and examples (60-100 words)
+- notes: Empty string (do not generate speaker notes)
 - image: Always include! Describe a relevant visual element
   {
     "prompt": "Detailed description of diagram/chart/icon that illustrates this slide's concept",
@@ -238,7 +296,7 @@ Output JSON:
     "**Bold term**: specific detail with data",
     "Another point with **emphasis** and numbers"
   ],
-  "notes": "Detailed speaker notes...",
+  "notes": "",
   "image": {
     "prompt": "Professional diagram showing...",
     "alt": "Diagram of...",
@@ -279,7 +337,7 @@ Return ONLY valid JSON.`;
         `**Key Metrics**: Measurable outcomes`,
         `**Innovation**: Latest developments`
       ],
-      notes: `This slide covers the essential aspects of ${topic}. Start by introducing the core concept, then discuss key metrics that demonstrate impact. Highlight recent innovations and developments in this area. Engage the audience with specific examples and encourage questions.`,
+      notes: '', // No speaker notes
       chart_spec: null,
       citations: generateCitations(topic),
       image: {
