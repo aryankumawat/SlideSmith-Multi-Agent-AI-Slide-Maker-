@@ -17,10 +17,7 @@ export default function LandingPage() {
             <span className="text-2xl font-bold text-gray-900 dark:text-white">SlideSmith</span>
           </div>
           <div className="flex items-center space-x-4">
-            <Link href="/studio">
-              <Button variant="outline">Studio</Button>
-            </Link>
-            <Link href="/studio">
+            <Link href="/studio-new">
               <Button>Get Started</Button>
             </Link>
           </div>
@@ -41,7 +38,7 @@ export default function LandingPage() {
             automatic theming, and seamless export to PDF or PPTX.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/studio">
+            <Link href="/studio-new">
               <Button size="lg" className="w-full sm:w-auto">
                 <Sparkles className="mr-2 h-5 w-5" />
                 Try It Now
@@ -161,7 +158,7 @@ export default function LandingPage() {
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               We're working on a comprehensive demo video that shows SlideSmith's capabilities.
             </p>
-            <Link href="/studio">
+            <Link href="/studio-new">
               <Button size="lg">
                 Try It Yourself
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -180,7 +177,7 @@ export default function LandingPage() {
           <p className="text-xl mb-8 opacity-90">
             Join thousands of users who are already using SlideSmith to create stunning presentations.
           </p>
-          <Link href="/studio">
+          <Link href="/studio-new">
             <Button size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
               <Sparkles className="mr-2 h-5 w-5" />
               Start Creating Now
