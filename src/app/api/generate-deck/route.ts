@@ -210,8 +210,8 @@ export async function POST(request: NextRequest) {
               per_slide_extracted_text_or_empty: perSlideFacts,
               text_density: meta.text_density
             }),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error(`Slide generation timed out for: ${slot.title}`)), 30000)
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`Slide generation timed out for: ${slot.title}`)), 90000)
             )
           ]);
           
