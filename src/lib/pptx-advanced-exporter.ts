@@ -1,41 +1,16 @@
 /**
- * Advanced PPTX Exporter
- * 
- * Specialized module for high-fidelity PPTX generation with:
- * - Native chart rendering (line, bar, pie, area, scatter)
- * - Smart text wrapping (no truncation)
- * - Image embedding from Unsplash URLs
- * - Theme-aware styling
- * - Proper layout handling
+ * Advanced PPTX Exporter — handles the new deck format (title + bullets + chart_spec + diagram_spec)
  */
-
 import PptxGenJS from 'pptxgenjs';
 
-interface ChartSpec {
-  kind: string;
-  title?: string;
-  data: Array<{
-    name: string;
-    labels: string[];
-    values: number[];
-  }>;
-  x_label?: string;
-  y_label?: string;
-}
-
-interface Image {
-  source: string;
-  alt: string;
-  prompt?: string;
-}
-
 interface Slide {
-  layout: string;
+  layout?: string;
   title: string;
   bullets?: string[];
   notes?: string;
-  chart_spec?: ChartSpec;
-  image?: Image;
+  chart_spec?: any;
+  diagram_spec?: any;
+  image?: { source?: string; alt?: string; prompt?: string };
   citations?: string[];
 }
 
@@ -45,490 +20,248 @@ interface Deck {
   slides: Slide[];
 }
 
-interface ThemeColors {
+interface ThemeConfig {
   background: string;
+  headerBg: string;
   text: string;
   textSecondary: string;
-  primary: string;
-  accent?: string;
+  accent: string;
+  bullet: string;
 }
 
-/**
- * Main export function
- */
+const THEMES: Record<string, ThemeConfig> = {
+  academic:     { background: 'FAFAFA', headerBg: '1A3A5C', text: '1A1A1A', textSecondary: '5A6A7A', accent: 'C0392B', bullet: '1A3A5C' },
+  corporate:    { background: 'F0F4FF', headerBg: '1E40AF', text: '1E293B', textSecondary: '64748B', accent: '2563EB', bullet: '1E40AF' },
+  deep_space:   { background: '0B0F1A', headerBg: '101828', text: 'E2E8F0', textSecondary: '94A3B8', accent: '7C3AED', bullet: '7C3AED' },
+  ultra_violet: { background: '0F0820', headerBg: '1B1035', text: 'F8FAFC', textSecondary: 'A1A1AA', accent: 'A855F7', bullet: 'A855F7' },
+  navy_gold:    { background: '0A1628', headerBg: '06101E', text: 'F0F4F8', textSecondary: '8EA8C3', accent: 'F4C430', bullet: 'F4C430' },
+  minimal:      { background: 'FFFFFF', headerBg: '1F2937', text: '111827', textSecondary: '6B7280', accent: '3B82F6', bullet: '3B82F6' },
+};
+
+const PALETTE = ['1A3A5C','C0392B','2E86AB','A23B72','F18F01','5C6BC0','26A69A','78909C'];
+
+function getTheme(name: string): ThemeConfig {
+  const key = name?.toLowerCase().replace(/[_\- ]/g, '_');
+  return THEMES[key] || THEMES[key?.replace(/_/g,'') as string] || THEMES.academic;
+}
+
+function stripMd(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .trim();
+}
+
+// Convert new chart_spec {type, labels, datasets} → PptxGenJS format [{name, labels, values}]
+function convertChartData(spec: any): { type: string; data: any[]; } {
+  const type = (spec.type || spec.kind || 'bar').toLowerCase();
+
+  // New format: spec.labels + spec.datasets
+  if (spec.labels && spec.datasets) {
+    const data = spec.datasets.map((ds: any) => ({
+      name: ds.label || 'Value',
+      labels: spec.labels,
+      values: ds.data || [],
+    }));
+    return { type, data };
+  }
+
+  // Old format: spec.data is already array of {name, labels, values}
+  if (Array.isArray(spec.data) && spec.data[0]?.values) {
+    return { type, data: spec.data };
+  }
+
+  // Flat array fallback
+  if (Array.isArray(spec.data)) {
+    const labels = spec.data.map((d: any) => d.name || String(d.label || ''));
+    const values = spec.data.map((d: any) => d.value ?? d.values?.[0] ?? 0);
+    return { type, data: [{ name: spec.title || 'Data', labels, values }] };
+  }
+
+  // Fallback demo
+  return { type, data: [{ name: 'Data', labels: ['A','B','C','D'], values: [40,65,52,78] }] };
+}
+
+function pptxChartType(type: string): string {
+  const map: Record<string, string> = {
+    bar: 'bar', line: 'line', pie: 'pie', area: 'area',
+    scatter: 'scatter', doughnut: 'doughnut', column: 'bar',
+  };
+  return map[type] || 'bar';
+}
+
 export async function exportToAdvancedPPTX(deck: Deck): Promise<Buffer> {
-  console.log('[Advanced PPTX] Starting export for deck:', deck.title);
-  console.log('[Advanced PPTX] Deck keys:', Object.keys(deck));
-  console.log('[Advanced PPTX] Slide count:', deck.slides?.length || 0);
-  
-  // Validate deck structure
-  if (!deck.slides || !Array.isArray(deck.slides)) {
-    throw new Error(`Invalid deck structure: slides is ${deck.slides === null ? 'null' : typeof deck.slides}`);
-  }
-  
-  if (deck.slides.length === 0) {
-    throw new Error('Cannot export deck with no slides');
-  }
-  
-  console.log('[Advanced PPTX] First slide sample:', JSON.stringify(deck.slides[0], null, 2));
-  
+  if (!deck?.slides?.length) throw new Error('Deck has no slides');
+
   const pptx = new PptxGenJS();
-  
-  // Set presentation properties
   pptx.defineLayout({ name: 'WIDE', width: 10, height: 5.625 });
   pptx.layout = 'WIDE';
   pptx.author = 'SlideSmith AI';
-  pptx.title = deck.title;
-  pptx.subject = 'AI-Generated Presentation';
-  
-  // Get theme colors
-  const themeColors = getThemeColors(deck.theme || 'deep_space');
-  console.log('[Advanced PPTX] Theme colors:', themeColors);
-  
-  // Process each slide
+  pptx.title = stripMd(deck.title);
+
+  const theme = getTheme(deck.theme);
+
   for (let i = 0; i < deck.slides.length; i++) {
     const slide = deck.slides[i];
-    console.log(`[Advanced PPTX] Processing slide ${i + 1}:`, {
-      title: slide.title,
-      hasBullets: !!slide.bullets,
-      bulletCount: slide.bullets?.length || 0,
-      hasChart: !!slide.chart_spec,
-      hasImage: !!slide.image,
-    });
     try {
-      await addAdvancedSlide(pptx, slide, themeColors);
-    } catch (slideError) {
-      console.error(`[Advanced PPTX] Error processing slide ${i + 1}:`, slideError);
-      throw new Error(`Failed to process slide ${i + 1}: ${slideError instanceof Error ? slideError.message : 'Unknown error'}`);
+      await addSlide(pptx, slide, theme, i + 1, deck.slides.length, deck.theme);
+    } catch (err) {
+      console.error(`[PPTX] Slide ${i+1} error:`, err);
+      // Add a simple fallback slide rather than failing the whole export
+      const ps = pptx.addSlide();
+      ps.background = { color: theme.background };
+      ps.addText(stripMd(slide.title || `Slide ${i+1}`), {
+        x: 0.5, y: 2, w: 9, h: 1.5,
+        fontSize: 32, bold: true, color: theme.text, align: 'center',
+      });
     }
   }
-  
-  console.log('[Advanced PPTX] Export complete, generating buffer...');
-  // Generate buffer
+
   const buffer = await pptx.write({ outputType: 'nodebuffer' });
   return Buffer.from(buffer as any);
 }
 
-/**
- * Add a slide with advanced rendering
- */
-async function addAdvancedSlide(
+async function addSlide(
   pptx: PptxGenJS,
   slide: Slide,
-  themeColors: ThemeColors
+  theme: ThemeConfig,
+  num: number,
+  total: number,
+  themeName: string,
 ): Promise<void> {
-  const pptxSlide = pptx.addSlide();
-  
-  // Set background
-  pptxSlide.background = { color: themeColors.background };
-  
-  // Determine layout and render accordingly
-  if (slide.chart_spec) {
-    renderChartSlide(pptxSlide, slide, themeColors);
-  } else if (slide.image) {
-    renderImageSlide(pptxSlide, slide, themeColors);
-  } else if (slide.bullets && slide.bullets.length > 0) {
-    renderBulletsSlide(pptxSlide, slide, themeColors);
-  } else {
-    renderTitleOnlySlide(pptxSlide, slide, themeColors);
-  }
-  
-  // Add speaker notes
-  if (slide.notes) {
-    pptxSlide.addNotes(slide.notes);
-  }
-}
+  const ps = pptx.addSlide();
+  ps.background = { color: theme.background };
 
-/**
- * Render slide with chart
- */
-function renderChartSlide(
-  slide: any,
-  slideData: Slide,
-  themeColors: ThemeColors
-): void {
-  // Title at top
-  if (slideData.title) {
-    slide.addText(wrapText(slideData.title, 80), {
-      x: 0.5,
-      y: 0.3,
-      w: 9,
-      h: 0.7,
-      fontSize: 32,
-      color: themeColors.text,
-      bold: true,
-      wrap: true,
-    });
-  }
-  
-  // Render actual chart (not placeholder!)
-  if (slideData.chart_spec) {
-    const chartSpec = slideData.chart_spec;
-    addNativeChart(slide, chartSpec, themeColors);
-  }
-  
-  // Add any bullets on the right side if present
-  if (slideData.bullets && slideData.bullets.length > 0) {
-    const bulletPoints = slideData.bullets
-      .slice(0, 5)
-      .map((item, idx) => ({
-        text: wrapText(item, 50),
-        options: { 
-          bullet: true,
-          fontSize: 14,
-          color: themeColors.text,
-        }
-      }));
-    
-    slide.addText(bulletPoints, {
-      x: 6.5,
-      y: 1.2,
-      w: 3,
-      h: 4,
-      fontSize: 14,
-      color: themeColors.text,
-    });
-  }
-}
+  const bullets = slide.bullets || [];
+  const hasChart = !!slide.chart_spec;
+  const hasDiagram = !!slide.diagram_spec;
 
-/**
- * Add native PowerPoint chart (not just a placeholder)
- */
-function addNativeChart(
-  slide: any,
-  chartSpec: ChartSpec,
-  themeColors: ThemeColors
-): void {
-  // Import chart types from PptxGenJS
-  const PptxGenJS = require('pptxgenjs');
-  
-  // Map our chart types to PptxGenJS chart types
-  const chartTypeMap: Record<string, any> = {
-    line: PptxGenJS.ChartType.line,
-    bar: PptxGenJS.ChartType.bar,
-    pie: PptxGenJS.ChartType.pie,
-    area: PptxGenJS.ChartType.area,
-    scatter: PptxGenJS.ChartType.scatter,
-    doughnut: PptxGenJS.ChartType.doughnut,
-  };
-  
-  const chartType = chartTypeMap[chartSpec.kind] || PptxGenJS.ChartType.bar;
-  
-  // Prepare chart data
-  const chartData: any[] = [];
-  
-  if (chartSpec.data && chartSpec.data.length > 0) {
-    // Convert our data format to PptxGenJS format
-    chartSpec.data.forEach(series => {
-      chartData.push({
-        name: series.name || 'Data',
-        labels: series.labels || [],
-        values: series.values || [],
-      });
-    });
-  } else {
-    // Fallback: create sample data
-    chartData.push({
-      name: 'Sample Data',
-      labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-      values: [10, 20, 30, 25],
-    });
-  }
-  
-  // Chart positioning
-  const hasRightContent = !!chartSpec.title;
-  const chartWidth = hasRightContent ? 6 : 8;
-  const chartX = hasRightContent ? 0.5 : 1;
-  
-  // Add chart to slide
-  slide.addChart(chartType, chartData, {
-    x: chartX,
-    y: 1.2,
-    w: chartWidth,
-    h: 3.8,
-    showTitle: false,
-    showLegend: true,
-    legendPos: 'b',
-    showLabel: true,
-    catAxisLabelColor: themeColors.text,
-    valAxisLabelColor: themeColors.text,
-    catAxisLabelFontSize: 11,
-    valAxisLabelFontSize: 11,
-    chartColors: [
-      themeColors.primary,
-      themeColors.accent || '8b5cf6',
-      '10b981',
-      'f59e0b',
-      'ef4444',
-      '3b82f6',
-    ],
-    valAxisMaxVal: undefined,
-    valAxisMinVal: 0,
-    catAxisTitle: chartSpec.x_label || '',
-    valAxisTitle: chartSpec.y_label || '',
-    dataLabelColor: themeColors.text,
-    dataLabelFontSize: 10,
+  // ── Header bar ──────────────────────────────────────────────
+  ps.addShape(pptx.ShapeType.rect, {
+    x: 0, y: 0, w: 10, h: 0.9,
+    fill: { color: theme.headerBg },
+    line: { type: 'none' },
   });
-}
 
-/**
- * Render slide with image
- */
-function renderImageSlide(
-  slide: any,
-  slideData: Slide,
-  themeColors: ThemeColors
-): void {
-  // Title at top
-  if (slideData.title) {
-    slide.addText(wrapText(slideData.title, 80), {
-      x: 0.5,
-      y: 0.3,
-      w: 9,
-      h: 0.7,
-      fontSize: 32,
-      color: themeColors.text,
-      bold: true,
-      wrap: true,
+  // Title in header
+  ps.addText(stripMd(slide.title || ''), {
+    x: 0.3, y: 0, w: 8.8, h: 0.9,
+    fontSize: 24, bold: true, color: 'FFFFFF',
+    valign: 'middle', wrap: true,
+  });
+
+  // Slide number
+  ps.addText(`${num} / ${total}`, {
+    x: 8.8, y: 0, w: 1, h: 0.9,
+    fontSize: 10, color: 'AAAAAA', align: 'right', valign: 'middle',
+  });
+
+  // ── Body ─────────────────────────────────────────────────────
+  const bodyTop = 1.0;
+  const bodyH = 4.3;
+  const hasVisual = hasChart || hasDiagram;
+  const bulletW = hasVisual && bullets.length > 0 ? 4.4 : 9.2;
+  const visualX = bullets.length > 0 ? 4.8 : 0.4;
+  const visualW = bullets.length > 0 ? 5.0 : 9.2;
+
+  // Bullets
+  if (bullets.length > 0) {
+    const maxB = Math.min(bullets.length, 8);
+    const textObjs = bullets.slice(0, maxB).map(b => ([
+      { text: '●  ', options: { color: theme.bullet, fontSize: 6 } },
+      { text: stripMd(b) + '\n', options: { color: theme.text, fontSize: maxB > 5 ? 13 : 15 } },
+    ])).flat();
+
+    ps.addText(textObjs as any, {
+      x: 0.4, y: bodyTop, w: bulletW, h: bodyH,
+      valign: 'top', wrap: true, lineSpacing: 22,
     });
   }
-  
-  // Image on left (or full if no bullets)
-  const hasBullets = slideData.bullets && slideData.bullets.length > 0;
-  const imageWidth = hasBullets ? 5 : 8;
-  const imageX = hasBullets ? 0.5 : 1;
-  
-  if (slideData.image && slideData.image.source) {
+
+  // Citations
+  if (slide.citations?.length) {
+    const citeText = slide.citations.slice(0,2).join('  |  ');
+    ps.addText(stripMd(citeText), {
+      x: 0.4, y: 5.2, w: 9.2, h: 0.3,
+      fontSize: 8, color: theme.textSecondary, italic: true,
+    });
+  }
+
+  // ── Chart ─────────────────────────────────────────────────────
+  if (hasChart) {
     try {
-      slide.addImage({
-        path: slideData.image.source,
-        x: imageX,
-        y: 1.2,
-        w: imageWidth,
-        h: 3.8,
-        sizing: {
-          type: 'contain',
-          w: imageWidth,
-          h: 3.8,
-        },
+      const { type, data } = convertChartData(slide.chart_spec);
+      const pptxType = pptxChartType(type);
+      const chartH = hasChart && hasDiagram ? 1.8 : 3.3;
+
+      (ps as any).addChart(pptxType, data, {
+        x: visualX, y: bodyTop, w: visualW, h: chartH,
+        showTitle: false,
+        showLegend: data.length > 1,
+        legendPos: 'b',
+        chartColors: PALETTE.map(c => c.toUpperCase()),
+        catAxisLabelColor: theme.textSecondary,
+        valAxisLabelColor: theme.textSecondary,
+        catAxisLabelFontSize: 10,
+        valAxisLabelFontSize: 10,
+        dataLabelColor: theme.text,
+        dataLabelFontSize: 9,
       });
-    } catch (error) {
-      // If image fails, add placeholder with alt text
-      slide.addText(slideData.image.alt || 'Image', {
-        x: imageX,
-        y: 2.5,
-        w: imageWidth,
-        h: 1,
-        fontSize: 16,
-        color: themeColors.textSecondary,
-        align: 'center',
-        italic: true,
+
+      if (slide.chart_spec?.caption) {
+        ps.addText(slide.chart_spec.caption, {
+          x: visualX, y: bodyTop + chartH + 0.05, w: visualW, h: 0.25,
+          fontSize: 9, color: theme.textSecondary, italic: true, align: 'center',
+        });
+      }
+    } catch (chartErr) {
+      console.warn('[PPTX] Chart render failed:', chartErr);
+      ps.addText('[Chart: ' + (slide.chart_spec?.title || 'Data Visualization') + ']', {
+        x: visualX, y: bodyTop, w: visualW, h: 2,
+        fontSize: 14, color: theme.textSecondary, align: 'center', valign: 'middle',
       });
     }
   }
-  
-  // Bullets on right if present
-  if (hasBullets && slideData.bullets) {
-    const bulletPoints = slideData.bullets
-      .slice(0, 6)
-      .map((item, idx) => ({
-        text: wrapText(item, 40),
-        options: { 
-          bullet: true,
-          fontSize: 16,
-          color: themeColors.text,
-          lineSpacing: 20,
-        }
-      }));
-    
-    slide.addText(bulletPoints, {
-      x: 6,
-      y: 1.2,
-      w: 3.5,
-      h: 4,
-      fontSize: 16,
-      color: themeColors.text,
-      valign: 'top',
-    });
-  }
-}
 
-/**
- * Render slide with bullets (most common)
- */
-function renderBulletsSlide(
-  slide: any,
-  slideData: Slide,
-  themeColors: ThemeColors
-): void {
-  // Title
-  if (slideData.title) {
-    slide.addText(wrapText(slideData.title, 80), {
-      x: 0.5,
-      y: 0.3,
-      w: 9,
-      h: 0.7,
-      fontSize: 36,
-      color: themeColors.text,
-      bold: true,
-      wrap: true,
-    });
-  }
-  
-  // Bullets with proper wrapping (NO truncation!)
-  if (slideData.bullets && slideData.bullets.length > 0) {
-    // Dynamically size based on number of bullets
-    const maxBullets = Math.min(slideData.bullets.length, 8);
-    const bulletHeight = 4 / maxBullets; // Distribute height evenly
-    
-    slideData.bullets.slice(0, maxBullets).forEach((bullet, index) => {
-      const yPos = 1.2 + (index * bulletHeight);
-      
-      slide.addText([{
-        text: `• ${wrapText(bullet, 100)}`,
-        options: {
-          fontSize: maxBullets > 6 ? 16 : 18,
-          color: themeColors.text,
-          lineSpacing: 20,
-        }
-      }], {
-        x: 0.7,
-        y: yPos,
-        w: 8.6,
-        h: bulletHeight * 0.9,
-        fontSize: maxBullets > 6 ? 16 : 18,
-        color: themeColors.text,
-        valign: 'top',
-        wrap: true,
-      });
-    });
-  }
-}
+  // ── Diagram (text representation in PPTX) ─────────────────────
+  if (hasDiagram) {
+    const diagY = hasChart ? bodyTop + (hasChart && hasDiagram ? 2.0 : 3.5) : bodyTop;
+    const diagH = hasChart ? 1.8 : 3.3;
+    const diag = slide.diagram_spec;
+    const diagType = diag?.type || 'diagram';
 
-/**
- * Render title-only slide
- */
-function renderTitleOnlySlide(
-  slide: any,
-  slideData: Slide,
-  themeColors: ThemeColors
-): void {
-  if (slideData.title) {
-    slide.addText(wrapText(slideData.title, 60), {
-      x: 1,
-      y: 2,
-      w: 8,
-      h: 2,
-      fontSize: 48,
-      color: themeColors.text,
-      bold: true,
-      align: 'center',
-      valign: 'middle',
-      wrap: true,
-    });
-  }
-}
-
-/**
- * Strip markdown formatting from text
- */
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '$1')   // Remove **bold**
-    .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
-    .replace(/__(.*?)__/g, '$1')       // Remove __bold__
-    .replace(/_(.*?)_/g, '$1')         // Remove _italic_
-    .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
-    .replace(/`(.*?)`/g, '$1')         // Remove `code`
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove [links](url)
-    .replace(/^#+\s+/gm, '')           // Remove # headings
-    .replace(/^\s*[-*+]\s+/gm, '')     // Remove list markers
-    .replace(/^\s*\d+\.\s+/gm, '')     // Remove numbered list markers
-    .trim();
-}
-
-/**
- * Smart text wrapping (NO truncation)
- * Breaks long text at word boundaries
- */
-function wrapText(text: string, maxCharsPerLine: number): string {
-  // Strip markdown first
-  const cleanText = stripMarkdown(text);
-  
-  if (cleanText.length <= maxCharsPerLine) return cleanText;
-  
-  const words = cleanText.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
-  
-  for (const word of words) {
-    if ((currentLine + ' ' + word).length <= maxCharsPerLine) {
-      currentLine += (currentLine ? ' ' : '') + word;
-    } else {
-      if (currentLine) lines.push(currentLine);
-      currentLine = word;
+    let diagText = `[${diagType.toUpperCase()} DIAGRAM]\n`;
+    if (diag?.nodes?.length) {
+      diagText += diag.nodes.map((n: any, i: number) =>
+        `${i+1}. ${n.label}${n.description ? ' — ' + n.description : ''}`
+      ).join('\n');
+    } else if (diag?.events?.length) {
+      diagText += diag.events.map((e: any) => `${e.year}: ${e.label}`).join('\n');
+    } else if (diag?.left && diag?.right) {
+      diagText += `${diag.left.title}: ${diag.left.items?.join(', ')}\nvs\n${diag.right.title}: ${diag.right.items?.join(', ')}`;
     }
+
+    ps.addShape(pptx.ShapeType.rect, {
+      x: visualX, y: diagY, w: visualW, h: diagH,
+      fill: { color: 'F0F4FF' },
+      line: { color: 'CBD5E1', pt: 1 },
+    });
+    ps.addText(diagText, {
+      x: visualX + 0.1, y: diagY + 0.1, w: visualW - 0.2, h: diagH - 0.2,
+      fontSize: 10, color: theme.text, valign: 'top', wrap: true, lineSpacing: 16,
+    });
   }
-  
-  if (currentLine) lines.push(currentLine);
-  
-  return lines.join('\n');
+
+  // ── Bottom accent line ──────────────────────────────────────────
+  ps.addShape(pptx.ShapeType.rect, {
+    x: 0, y: 5.5, w: 10, h: 0.125,
+    fill: { color: theme.accent },
+    line: { type: 'none' },
+  });
+
+  if (slide.notes) {
+    ps.addNotes(stripMd(slide.notes));
+  }
 }
-
-/**
- * Get theme colors with enhanced palette
- */
-function getThemeColors(theme: string): ThemeColors {
-  const normalizedTheme = theme.toLowerCase().replace(/[_-]/g, '').replace(/\s+/g, '');
-  
-  const themes: Record<string, ThemeColors> = {
-    deepspace: {
-      background: '0a0a0f',
-      text: 'ffffff',
-      textSecondary: 'a1a1aa',
-      primary: '6366f1',
-      accent: '8b5cf6',
-    },
-    ultraviolet: {
-      background: '1a0b2e',
-      text: 'ffffff',
-      textSecondary: 'c4b5fd',
-      primary: '8b5cf6',
-      accent: 'a78bfa',
-    },
-    minimal: {
-      background: 'ffffff',
-      text: '111827',
-      textSecondary: '6b7280',
-      primary: '000000',
-      accent: '374151',
-    },
-    corporate: {
-      background: 'f8fafc',
-      text: '1e293b',
-      textSecondary: '64748b',
-      primary: '1e40af',
-      accent: '3b82f6',
-    },
-    neongrid: {
-      background: '000000',
-      text: '00ff88',
-      textSecondary: '00d4ff',
-      primary: '00ff88',
-      accent: '00d4ff',
-    },
-    professional: {
-      background: 'f8fafc',
-      text: '1e293b',
-      textSecondary: '64748b',
-      primary: '1e40af',
-      accent: '3b82f6',
-    },
-  };
-  
-  return themes[normalizedTheme] || themes.deepspace;
-}
-
-// Export the global pptx for chart types
-const pptx = new PptxGenJS();
-

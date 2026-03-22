@@ -17,41 +17,35 @@ const getLLMConfig = (): LLMConfig => {
 
 const llmClient = new LLMClient(getLLMConfig());
 
-// Helper function to clean markdown-wrapped JSON from LLM responses
+// Robustly extract and clean JSON from LLM responses
 function cleanJSONResponse(response: string): string {
   let cleaned = response.trim();
-  
-  // Remove markdown code blocks
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.replace(/^```json\n/, '').replace(/\n```$/, '');
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```\n/, '').replace(/\n```$/, '');
-  }
-  
-  // Remove conversational prefixes that LLMs sometimes add
-  cleaned = cleaned.replace(/^(Okay|Sure|Here|Certainly|Here's|Here is)[,:]?\s*/i, '');
-  
-  // Fix common JSON issues from LLMs
-  try {
-    // Try to parse first - if it works, return as-is
-    JSON.parse(cleaned);
+
+  // Strip markdown fences
+  cleaned = cleaned.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+
+  // Strip conversational preamble before first {
+  const braceIdx = cleaned.indexOf('{');
+  if (braceIdx > 0) cleaned = cleaned.slice(braceIdx);
+
+  // Strip anything after the last }
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (lastBrace >= 0 && lastBrace < cleaned.length - 1) cleaned = cleaned.slice(0, lastBrace + 1);
+
+  // Try to parse as-is
+  try { JSON.parse(cleaned); return cleaned; } catch {}
+
+  // Fix common escaping issues
+  cleaned = cleaned
+    .replace(/\r\n/g, ' ').replace(/\n/g, ' ')
+    .replace(/\\n/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/,\s*}/g, '}')
+    .replace(/,\s*]/g, ']');
+
+  try { JSON.parse(cleaned); return cleaned; } catch (e) {
+    console.warn('[JSON] Parse failed after cleaning:', (e as Error).message);
     return cleaned;
-  } catch {
-    // Fix escaped characters that break JSON
-    cleaned = cleaned
-      .replace(/\\n/g, ' ')  // Replace literal \n with space
-      .replace(/\\\\/g, '\\')  // Fix double escapes
-      .replace(/\\"/g, '"')    // Fix escaped quotes in wrong places
-      .replace(/\\'/g, "'");   // Fix escaped single quotes
-    
-    // Try one more time to validate
-    try {
-      JSON.parse(cleaned);
-    } catch (finalError) {
-      console.warn('[JSON Clean] Could not parse JSON after cleaning:', finalError);
-    }
-    
-    return cleaned.trim();
   }
 }
 
@@ -268,79 +262,45 @@ export async function generateSlide(params: {
   };
 }> {
   const density = params.text_density || 'medium';
-  const bulletInstructions = getBulletInstructions(density);
   const isChartSlide = params.slide_context.layout === 'chart';
+  const bulletCount = density === 'low' ? 2 : density === 'text_heavy' ? 6 : 4;
 
-  const prompt = `You are an expert academic presentation designer creating professional, scholarly slides.
+  const prompt = `Write JSON for one presentation slide. Topic: "${params.slide_context.title}". Section: "${params.slide_context.section || 'Main'}". Audience: ${params.slide_context.audience || 'general'}.
 
-RULES:
-1. Use **double asterisks** around key terms for emphasis.
-2. Include specific numbers, percentages, or cited statistics wherever possible.
-3. NO emojis in titles or bullets.
-4. Titles should be specific and informative, not generic.
-
-${bulletInstructions}
-
-SLIDE TO GENERATE:
-Title: ${params.slide_context.title}
-Layout: ${params.slide_context.layout}
-Section: ${params.slide_context.section || 'Main Content'}
-DOCUMENT_FACTS: """${params.per_slide_extracted_text_or_empty || 'None'}"""
-
-${isChartSlide ? `CHART REQUIRED: Generate a chart_spec with realistic data relevant to the slide title.
-Chart spec format:
+Return ONLY this JSON (no extra text, no markdown):
 {
-  "type": "bar" | "line" | "pie" | "area",
-  "title": "Chart Title",
-  "labels": ["Label1", "Label2", ...],
-  "datasets": [
-    {"label": "Series Name", "data": [number, ...], "backgroundColor": ["#color", ...]}
-  ],
-  "caption": "Brief description of what the chart shows"
-}` : `chart_spec: null (not a chart slide)`}
-
-DIAGRAM SPEC (for process flows, comparisons, hierarchies):
-If the slide content benefits from a visual diagram, include diagram_spec:
-{
-  "type": "flowchart" | "comparison" | "timeline" | "hierarchy" | "cycle",
-  "title": "Diagram Title",
-  "nodes": [{"id": "1", "label": "Step/Item", "description": "brief detail"}],
-  "edges": [{"from": "1", "to": "2", "label": "optional arrow label"}]
-}
-For "comparison": use {"type": "comparison", "left": {"title": "A", "items": ["..."]}, "right": {"title": "B", "items": ["..."]}}
-For "timeline": use {"type": "timeline", "events": [{"year": "2020", "label": "Event", "description": "..."}]}
-Set diagram_spec to null if not needed.
-
-OUTPUT JSON:
-{
-  "title": "**Specific Title** with Key Term",
-  "bullets": ["**Term**: detailed fact with number", "..."],
+  "title": "specific informative title with **bold key term**",
+  "bullets": ["**key term**: specific fact with number", "..."],
   "notes": "",
-  "image": {"prompt": "Scholarly diagram or illustration of...", "alt": "...", "source": "placeholder"},
-  "chart_spec": null or {...},
-  "diagram_spec": null or {...},
+  "chart_spec": ${isChartSlide ? '{"type":"bar","title":"...","labels":["A","B","C","D"],"datasets":[{"label":"Value","data":[40,65,52,78]}],"caption":"..."}' : 'null'},
+  "diagram_spec": null,
   "citations": []
 }
 
-Return ONLY valid JSON.`;
+Rules:
+- bullets array must have exactly ${bulletCount} items
+- Each bullet starts with **bold term**: then a fact
+- No emojis
+- ${isChartSlide ? 'Fill in chart_spec with realistic data for the topic' : 'chart_spec must be null'}
+- diagram_spec is null unless a flowchart/timeline genuinely helps (keep it null for simplicity)
+
+Output JSON only (no extra text):`;
 
   try {
     const response = await llmClient.generateContent(prompt);
     const cleaned = cleanJSONResponse(response);
     const parsed = JSON.parse(cleaned);
-    
-    // Ensure image is always present with Unsplash URL
-    if (!parsed.image) {
-      parsed.image = {
-        prompt: `Professional ${params.slide_context.title} diagram with modern, clean design`,
-        alt: `Visual representation of ${params.slide_context.title}`,
-        source: generateUnsplashUrl(params.slide_context.title)
-      };
-    } else if (!parsed.image.source || parsed.image.source === 'placeholder') {
-      parsed.image.source = generateUnsplashUrl(params.slide_context.title);
-    }
 
+    // Normalise fields
+    if (!Array.isArray(parsed.bullets) || parsed.bullets.length === 0) {
+      parsed.bullets = [`**${params.slide_context.title}**: Key insight`, '**Impact**: Measurable outcome'];
+    }
+    if (!parsed.title) parsed.title = params.slide_context.title;
+    if (!parsed.notes) parsed.notes = '';
+    if (!parsed.citations) parsed.citations = [];
     if (!parsed.diagram_spec) parsed.diagram_spec = null;
+    // Remove image field - we don't use it in the new SlideCanvas
+    delete parsed.image;
 
     return parsed;
   } catch (error) {
