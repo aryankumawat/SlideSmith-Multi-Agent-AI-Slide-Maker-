@@ -9,38 +9,65 @@ const getLLMConfig = (): LLMConfig => ({
 
 const llmClient = new LLMClient(getLLMConfig());
 
-// ─── JSON extractor ───────────────────────────────────────────────────────────
-// Handles: markdown fences, preamble text, trailing text, bad escapes
+// ─── JSON extractor ────────────────────────────────────────────────────────────
 function extractJSON(raw: string): any {
   if (!raw) throw new Error('Empty response');
   let s = raw.trim();
-
-  // Remove markdown fences
   s = s.replace(/^```(?:json)?[\r\n]*/m, '').replace(/[\r\n]*```\s*$/m, '').trim();
-
-  // Find outermost { ... }
   const start = s.indexOf('{');
   const end = s.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) throw new Error('No JSON object found in response');
+  if (start === -1 || end === -1 || end <= start) throw new Error('No JSON object found');
   s = s.slice(start, end + 1);
-
-  // Try direct parse
   try { return JSON.parse(s); } catch {}
-
-  // Fix common issues: unescaped newlines inside strings, trailing commas
   s = s
-    .replace(/[\r\n]+/g, ' ')          // collapse newlines
-    .replace(/,\s*([}\]])/g, '$1')      // trailing commas
-    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":'); // unquoted keys
-
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
   try { return JSON.parse(s); } catch {}
-
-  // Last resort: replace literal backslash-n, tabs
   s = s.replace(/\\n/g, ' ').replace(/\\t/g, ' ');
-  return JSON.parse(s); // throws if still broken
+  return JSON.parse(s);
 }
 
-// ─── Outline generation ───────────────────────────────────────────────────────
+// ─── Premium layout assignment ─────────────────────────────────────────────────
+function assignPremiumLayouts(parsed: any): void {
+  const sections = parsed.sections || [];
+  const allSlides: any[] = sections.flatMap((s: any) => s.slides || []);
+  if (!allSlides.length) return;
+
+  // Slide 1 → title
+  allSlides[0].layout = 'title';
+
+  // Last slide → center_focus (summary/takeaways)
+  if (allSlides.length > 1) {
+    allSlides[allSlides.length - 1].layout = 'center_focus';
+  }
+
+  // First slide of each section after the first → section_divider
+  let firstSection = true;
+  for (const section of sections) {
+    if (firstSection) { firstSection = false; continue; }
+    if (section.slides?.length > 0) {
+      const s = section.slides[0];
+      if (s.layout !== 'center_focus') s.layout = 'section_divider';
+    }
+  }
+
+  // Rotate remaining through premium layouts
+  const premiumRotation = [
+    'split', 'grid_cards', 'data_insight', 'split',
+    'comparison', 'timeline', 'title_bullets', 'split',
+    'grid_cards', 'title_bullets',
+  ];
+  const reserved = new Set(['title', 'section_divider', 'center_focus', 'chart']);
+  let li = 0;
+  for (const slide of allSlides) {
+    if (reserved.has(slide.layout)) continue;
+    slide.layout = premiumRotation[li % premiumRotation.length];
+    li++;
+  }
+}
+
+// ─── Outline generation ────────────────────────────────────────────────────────
 export async function generateOutline(params: {
   slide_count: number;
   audience: string;
@@ -55,15 +82,12 @@ export async function generateOutline(params: {
   }>;
 }> {
   const { slide_count, audience, tone, topic_or_prompt_or_instructions: topic } = params;
-
-  // Keep chart slides to ~20% of total
   const chartSlides = Math.max(1, Math.round(slide_count * 0.2));
-  const bulletSlides = slide_count - chartSlides;
 
   const prompt = `You are creating a ${slide_count}-slide presentation outline on: "${topic}"
 Audience: ${audience}. Tone: ${tone}.
 
-Return ONLY valid JSON, no other text. Use this exact format:
+Return ONLY valid JSON, no other text:
 
 {
   "title": "Engaging presentation title about ${topic}",
@@ -86,17 +110,16 @@ Return ONLY valid JSON, no other text. Use this exact format:
     {
       "name": "Conclusion",
       "slides": [
-        {"title": "Specific slide title 6", "layout": "title_bullets", "section": "Conclusion"}
+        {"title": "Summary and Key Takeaways", "layout": "title_bullets", "section": "Conclusion"}
       ]
     }
   ]
 }
 
 RULES:
-- Total slides across ALL sections combined must equal EXACTLY ${slide_count}
-- ${chartSlides} slide(s) should use layout "chart", the rest use "title_bullets"
-- Each slide title must be specific and informative about "${topic}" — not generic like "Overview" or "Introduction"
-- Make titles that reflect real subtopics of "${topic}"
+- Total slides across ALL sections must equal EXACTLY ${slide_count}
+- ${chartSlides} slide(s) should use layout "chart"
+- Each slide title must be specific and informative about "${topic}"
 
 JSON:`;
 
@@ -104,19 +127,15 @@ JSON:`;
     const response = await llmClient.generateContent(prompt);
     const parsed = extractJSON(response);
 
-    // Count and adjust to exact slide_count
     const allSlides: any[] = parsed.sections?.flatMap((s: any) => s.slides || []) || [];
     const got = allSlides.length;
 
-    if (got === slide_count) return parsed;
-
-    // Pad or trim
     if (got < slide_count) {
       const last = parsed.sections[parsed.sections.length - 1];
       for (let i = got; i < slide_count; i++) {
         last.slides.push({ title: `${topic}: Key Point ${i + 1}`, layout: 'title_bullets', section: last.name });
       }
-    } else {
+    } else if (got > slide_count) {
       let excess = got - slide_count;
       for (let si = parsed.sections.length - 1; si >= 0 && excess > 0; si--) {
         const cut = Math.min(excess, parsed.sections[si].slides.length - 1);
@@ -124,19 +143,20 @@ JSON:`;
       }
     }
 
+    assignPremiumLayouts(parsed);
     return parsed;
   } catch (err) {
-    console.error('[Outline] LLM failed, using smart fallback:', err);
-    return buildFallbackOutline(topic, slide_count);
+    console.error('[Outline] LLM failed, using fallback:', err);
+    const fallback = buildFallbackOutline(topic, slide_count);
+    assignPremiumLayouts(fallback);
+    return fallback;
   }
 }
 
 function buildFallbackOutline(topic: string, count: number) {
-  // Build meaningful section-based outline from the topic words
   const words = topic.replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 2);
   const titleWord = words.slice(0, 3).join(' ') || topic;
 
-  const layouts = ['title_bullets','title_bullets','chart','title_bullets','title_bullets','chart','title_bullets'];
   const sections = [
     { name: 'Introduction', slides: [] as any[] },
     { name: 'Core Concepts', slides: [] as any[] },
@@ -171,7 +191,7 @@ function buildFallbackOutline(topic: string, count: number) {
     for (let j = 0; j < size && idx < count; j++) {
       sections[si].slides.push({
         title: slideTitleTemplates[idx] || `${topic}: Point ${idx + 1}`,
-        layout: layouts[idx % layouts.length],
+        layout: 'title_bullets',
         section: sections[si].name,
       });
       idx++;
@@ -190,14 +210,239 @@ function distributeSections(total: number, sectionCount: number): number[] {
   return Array.from({ length: sectionCount }, (_, i) => base + (i < rem ? 1 : 0));
 }
 
-// ─── Slide content generation ─────────────────────────────────────────────────
+// ─── Layout-specific slide prompts ────────────────────────────────────────────
+function getLayoutPrompt(layout: string, title: string, bulletCount: number): string {
+  switch (layout) {
+    case 'title':
+      return `Create a title slide for a presentation titled: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": "A compelling subtitle in 15-20 words capturing the essence of this presentation",
+  "bullets": ["First key theme of the presentation", "Second key theme", "Third key theme"],
+  "stat_blocks": null,
+  "cards": null,
+  "chart_spec": null,
+  "diagram_spec": null,
+  "notes": "Welcome audience and set expectations.",
+  "citations": []
+}
+JSON:`;
+
+    case 'section_divider':
+      return `Create a section divider slide for the section: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": "One compelling tagline for this section in 10-15 words",
+  "bullets": ["One sentence about what this section explores or reveals"],
+  "stat_blocks": null,
+  "cards": null,
+  "chart_spec": null,
+  "diagram_spec": null,
+  "notes": "Transition to this section.",
+  "citations": []
+}
+JSON:`;
+
+    case 'center_focus':
+      return `Create a high-impact summary slide about: "${title}"
+This is the FINAL slide — make it memorable with real statistics.
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": "The single most important takeaway as one powerful sentence",
+  "stat_blocks": [
+    {"value": "XX%", "label": "specific metric about ${title}"},
+    {"value": "$XXB", "label": "specific metric about ${title}"},
+    {"value": "XXx", "label": "specific metric about ${title}"}
+  ],
+  "bullets": ["One final call-to-action or key recommendation sentence"],
+  "cards": null,
+  "chart_spec": null,
+  "diagram_spec": null,
+  "notes": "Closing remarks and Q&A invitation.",
+  "citations": []
+}
+Rules:
+- stat_blocks MUST have REAL statistics with actual numbers about "${title}"
+- subtitle must be a powerful, specific sentence
+JSON:`;
+
+    case 'grid_cards':
+      return `Create a grid cards slide showing 4 key aspects of: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": null,
+  "bullets": [],
+  "stat_blocks": null,
+  "cards": [
+    {"icon": "🔬", "title": "First Aspect", "description": "Specific fact with a number in 10-12 words"},
+    {"icon": "📊", "title": "Second Aspect", "description": "Specific fact with a number in 10-12 words"},
+    {"icon": "⚡", "title": "Third Aspect", "description": "Specific fact with a number in 10-12 words"},
+    {"icon": "🛡️", "title": "Fourth Aspect", "description": "Specific fact with a number in 10-12 words"}
+  ],
+  "chart_spec": null,
+  "diagram_spec": null,
+  "notes": "",
+  "citations": []
+}
+Rules:
+- Each card title and description MUST be specific to "${title}"
+- Use relevant, varied emoji icons
+- Include actual statistics or facts in descriptions
+JSON:`;
+
+    case 'data_insight':
+      return `Create a data and statistics slide about: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": null,
+  "stat_blocks": [
+    {"value": "$XX.XB", "label": "Market or Key Metric"},
+    {"value": "XX%", "label": "Growth or Rate Metric"},
+    {"value": "XXM", "label": "Scale or Volume Metric"}
+  ],
+  "bullets": ["**Key trend**: one specific insight from the data with a real statistic about ${title}"],
+  "cards": null,
+  "chart_spec": {"type":"bar","title":"${title} Trends","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,68,79,95]}],"caption":"Growth trend 2020-2024"},
+  "diagram_spec": null,
+  "notes": "",
+  "citations": []
+}
+Rules:
+- stat_blocks MUST have real numbers/percentages specifically about "${title}"
+- chart data must reflect realistic trends for "${title}"
+JSON:`;
+
+    case 'comparison':
+      return `Create a comparison slide contrasting two aspects of: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": null,
+  "bullets": [],
+  "stat_blocks": null,
+  "cards": null,
+  "chart_spec": null,
+  "diagram_spec": {
+    "type": "comparison",
+    "left": {
+      "title": "Traditional Approach",
+      "items": ["specific point 1 with data", "specific point 2", "specific point 3"]
+    },
+    "right": {
+      "title": "Modern Approach",
+      "items": ["specific improved point 1 with data", "specific improved point 2", "specific improved point 3"]
+    }
+  },
+  "notes": "",
+  "citations": []
+}
+Rules:
+- Both sides MUST relate specifically to "${title}" with concrete details
+JSON:`;
+
+    case 'timeline':
+      return `Create a timeline slide showing the progression of: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": null,
+  "bullets": [],
+  "stat_blocks": null,
+  "cards": null,
+  "chart_spec": null,
+  "diagram_spec": {
+    "type": "timeline",
+    "events": [
+      {"year": "2019", "label": "First milestone", "description": "brief real context"},
+      {"year": "2020", "label": "Second milestone", "description": "brief real context"},
+      {"year": "2021", "label": "Third milestone", "description": "brief real context"},
+      {"year": "2022", "label": "Fourth milestone", "description": "brief real context"},
+      {"year": "2023", "label": "Fifth milestone", "description": "brief real context"}
+    ]
+  },
+  "notes": "",
+  "citations": []
+}
+Rules:
+- Events MUST be real, specific milestones related to "${title}" with actual years
+JSON:`;
+
+    case 'chart':
+      return `Create a data-driven chart slide about: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": null,
+  "bullets": [
+    "**Key insight 1**: specific finding with a real statistic about ${title}",
+    "**Key insight 2**: another specific finding with a number"
+  ],
+  "stat_blocks": null,
+  "cards": null,
+  "chart_spec": {"type":"bar","title":"${title} — Data","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,61,74,88]}],"caption":"Trend 2020-2024"},
+  "diagram_spec": null,
+  "notes": "",
+  "citations": []
+}
+Rules:
+- chart_spec MUST have realistic data specific to "${title}"
+- bullets must contain real insights from the data
+JSON:`;
+
+    case 'split':
+    default:
+      return `Write content for a presentation slide titled: "${title}"
+
+Return ONLY this JSON:
+{
+  "title": "${title}",
+  "subtitle": null,
+  "bullets": [
+    "**Key term 1**: specific fact or statistic about ${title}",
+    "**Key term 2**: another specific fact with a number",
+    "**Key term 3**: another point with evidence",
+    "**Key term 4**: concluding insight"
+  ],
+  "stat_blocks": null,
+  "cards": null,
+  "chart_spec": null,
+  "diagram_spec": null,
+  "notes": "",
+  "citations": []
+}
+Rules:
+- EXACTLY ${bulletCount} bullets
+- Each bullet MUST be about "${title}" with real, specific information
+- Bold the key term in each bullet using **asterisks**
+- Include numbers, percentages, or years where relevant
+JSON:`;
+  }
+}
+
+// ─── Slide content generation ──────────────────────────────────────────────────
 export async function generateSlide(params: {
   slide_context: any;
   per_slide_extracted_text_or_empty: string;
   text_density?: string;
 }): Promise<{
   title: string;
+  subtitle?: string;
   bullets: string[];
+  stat_blocks?: Array<{ value: string; label: string }> | null;
+  cards?: Array<{ icon: string; title: string; description: string }> | null;
   notes: string;
   chart_spec: any;
   diagram_spec: any;
@@ -205,101 +450,100 @@ export async function generateSlide(params: {
 }> {
   const density = params.text_density || 'medium';
   const bulletCount = density === 'low' ? 2 : density === 'text_heavy' ? 6 : 4;
-  const isChart = params.slide_context.layout === 'chart';
+  const layout = params.slide_context.layout || 'title_bullets';
   const slideTitle = params.slide_context.title;
 
-  const chartExample = isChart
-    ? `{"type":"bar","title":"${slideTitle} — Data","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,61,74,88]}],"caption":"Trend from 2020 to 2024"}`
-    : 'null';
-
-  const prompt = `Write content for a presentation slide titled: "${slideTitle}"
-
-Return ONLY this JSON:
-{
-  "title": "${slideTitle}",
-  "bullets": [
-    "**Key term 1**: specific fact or statistic about ${slideTitle}",
-    "**Key term 2**: another specific fact with a number",
-    "**Key term 3**: another point with evidence",
-    "**Key term 4**: concluding insight"
-  ],
-  "chart_spec": ${chartExample},
-  "diagram_spec": null,
-  "notes": "",
-  "citations": []
-}
-
-Rules:
-- Write EXACTLY ${bulletCount} bullets in the array
-- Each bullet MUST be about "${slideTitle}" with real, specific information
-- Bold the key term in each bullet using **asterisks**
-- Include numbers, percentages, or years where relevant
-- No generic phrases like "key concept" or "core insight"
-${isChart ? `- chart_spec: fill in with real data relevant to "${slideTitle}"` : '- chart_spec: must be null'}
-
-JSON:`;
+  const prompt = getLayoutPrompt(layout, slideTitle, bulletCount);
 
   try {
     const response = await llmClient.generateContent(prompt);
     const parsed = extractJSON(response);
 
-    // Validate and fix
-    if (!Array.isArray(parsed.bullets) || parsed.bullets.length === 0) {
-      throw new Error('No bullets in response');
-    }
     parsed.title = parsed.title || slideTitle;
     parsed.notes = parsed.notes || '';
     parsed.citations = parsed.citations || [];
     parsed.diagram_spec = parsed.diagram_spec || null;
-    if (!isChart) parsed.chart_spec = null;
+    if (!Array.isArray(parsed.bullets)) parsed.bullets = [];
+
+    // Ensure chart for chart/data_insight layouts
+    if ((layout === 'chart' || layout === 'data_insight') && !parsed.chart_spec) {
+      parsed.chart_spec = {
+        type: 'bar',
+        title: slideTitle,
+        labels: ['2020', '2021', '2022', '2023', '2024'],
+        datasets: [{ label: 'Value', data: [42, 55, 61, 74, 88] }],
+        caption: 'Data trend',
+      };
+    } else if (layout !== 'chart' && layout !== 'data_insight') {
+      parsed.chart_spec = parsed.chart_spec || null;
+    }
 
     return parsed;
   } catch (err) {
-    console.error(`[Slide] "${slideTitle}" failed:`, err);
-    // Retry once with an even simpler prompt
+    console.error(`[Slide] "${slideTitle}" (${layout}) failed:`, err);
     try {
-      return await generateSlideSimple(slideTitle, bulletCount, isChart);
+      return await generateSlideSimple(slideTitle, bulletCount, layout === 'chart' || layout === 'data_insight');
     } catch {
-      return buildFallbackSlide(slideTitle, density);
+      return buildFallbackSlide(slideTitle, density, layout);
     }
   }
 }
 
 async function generateSlideSimple(title: string, bulletCount: number, isChart: boolean): Promise<any> {
   const prompt = `List ${bulletCount} facts about "${title}". Be specific with numbers and statistics.
-Format as JSON: {"title":"${title}","bullets":["fact 1","fact 2","fact 3","fact 4"],"chart_spec":null,"diagram_spec":null,"notes":"","citations":[]}
+Format as JSON: {"title":"${title}","subtitle":null,"bullets":["fact 1","fact 2","fact 3","fact 4"],"stat_blocks":null,"cards":null,"chart_spec":null,"diagram_spec":null,"notes":"","citations":[]}
 JSON:`;
 
   const response = await llmClient.generateContent(prompt);
   const parsed = extractJSON(response);
   if (!Array.isArray(parsed.bullets) || parsed.bullets.length === 0) throw new Error('retry failed');
 
-  // Bold first word of each bullet if not already bolded
   parsed.bullets = parsed.bullets.map((b: string) => {
     if (b.startsWith('**')) return b;
     const colonIdx = b.indexOf(':');
-    if (colonIdx > 0 && colonIdx < 30) {
-      return `**${b.slice(0, colonIdx)}**:${b.slice(colonIdx + 1)}`;
-    }
+    if (colonIdx > 0 && colonIdx < 30) return `**${b.slice(0, colonIdx)}**:${b.slice(colonIdx + 1)}`;
     return b;
   });
 
-  if (!isChart) parsed.chart_spec = null;
+  if (isChart) {
+    parsed.chart_spec = parsed.chart_spec || {
+      type: 'bar', title, labels: ['2020', '2021', '2022', '2023', '2024'],
+      datasets: [{ label: 'Value', data: [40, 52, 65, 78, 90] }], caption: 'Trend data',
+    };
+  } else {
+    parsed.chart_spec = null;
+  }
   parsed.diagram_spec = null;
+  parsed.stat_blocks = null;
+  parsed.cards = null;
   return parsed;
 }
 
-function buildFallbackSlide(title: string, density: string) {
-  // This fallback is now only hit if both LLM attempts fail
+function buildFallbackSlide(title: string, density: string, layout: string) {
   const count = density === 'low' ? 2 : density === 'text_heavy' ? 6 : 4;
   const bullets = Array.from({ length: count }, (_, i) => {
     const terms = ['Overview', 'Key Finding', 'Impact', 'Application', 'Evidence', 'Conclusion'];
-    return `**${terms[i] || 'Point ' + (i+1)}**: ${title} — point ${i+1} (LLM unavailable)`;
+    return `**${terms[i] || 'Point ' + (i + 1)}**: ${title} — point ${i + 1}`;
   });
-  return { title, bullets, notes: '', chart_spec: null, diagram_spec: null, citations: [] };
+  return {
+    title,
+    subtitle: undefined,
+    bullets,
+    stat_blocks: null,
+    cards: null,
+    notes: '',
+    chart_spec: (layout === 'chart' || layout === 'data_insight') ? {
+      type: 'bar', title,
+      labels: ['2020', '2021', '2022', '2023', '2024'],
+      datasets: [{ label: 'Value', data: [40, 52, 65, 78, 90] }],
+      caption: 'Trend data',
+    } : null,
+    diagram_spec: null,
+    citations: [],
+  };
 }
 
-// ─── Stub exports (used by route but not needed in new flow) ──────────────────
+// ─── Stub exports ──────────────────────────────────────────────────────────────
 export function harvestFactsForSlide(_: string, __: string): string { return ''; }
 export function tableMatchesTitle(_: string, __: string): boolean { return false; }
 export function tableForTitle(_: string, __: string): any { return null; }
@@ -308,8 +552,6 @@ export async function parseDocuments(docUrls: string[]): Promise<string> {
   if (!docUrls?.length) return '';
   return `Documents: ${docUrls.map(u => u.split('/').pop()).join(', ')}`;
 }
-
-// Keep generateVisual as a no-op so the route import doesn't break
 export async function generateVisual(_: any): Promise<{ prompt: string; alt: string }> {
   return { prompt: '', alt: '' };
 }

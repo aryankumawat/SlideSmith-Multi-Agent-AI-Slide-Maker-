@@ -37,13 +37,16 @@ export type ChartSpec = {
 };
 
 export type Slide = {
-  layout: 'title' | 'title_bullets' | 'two_column' | 'quote' | 'chart' | 'image_full';
+  layout: string;
   title: string;
+  subtitle?: string;
   bullets?: string[];
+  stat_blocks?: Array<{ value: string; label: string }> | null;
+  cards?: Array<{ icon: string; title: string; description: string }> | null;
   notes?: string;
   chart_spec?: ChartSpec | null;
   diagram_spec?: any | null;
-  image?: { prompt: string; alt: string; source: 'generated' | 'uploaded' | 'url' };
+  image?: { prompt: string; alt: string; source: string };
   citations?: string[];
 };
 
@@ -235,7 +238,10 @@ export async function POST(request: NextRequest) {
           slides.push({
             layout: slot.layout as Slide['layout'],
             title: draft.title,
+            subtitle: draft.subtitle,
             bullets: draft.bullets,
+            stat_blocks: draft.stat_blocks,
+            cards: draft.cards,
             notes: draft.notes,
             chart_spec: withChart.chart_spec || null,
             diagram_spec: draft.diagram_spec || null,

@@ -9,7 +9,10 @@ import { Download, RefreshCw, Sparkles } from 'lucide-react';
 interface Slide {
   layout: string;
   title: string;
+  subtitle?: string;
   bullets?: string[];
+  stat_blocks?: Array<{ value: string; label: string }> | null;
+  cards?: Array<{ icon: string; title: string; description: string }> | null;
   notes?: string;
   chart_spec?: any;
   diagram_spec?: any;
