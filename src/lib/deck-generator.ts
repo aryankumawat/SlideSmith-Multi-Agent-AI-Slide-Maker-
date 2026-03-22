@@ -236,14 +236,30 @@ Return ONLY valid JSON with specific, engaging titles for the given topic.`;
   }
 }
 
+function getBulletInstructions(density: string): string {
+  switch (density) {
+    case 'low':
+      return `BULLET COUNT: 1-2 bullets ONLY. Each bullet is short (≤12 words), punchy, and impactful.
+DIAGRAM: Always include a diagram_spec (flowchart, comparison, or timeline) instead of text.`;
+    case 'text_heavy':
+      return `BULLET COUNT: 5-7 bullets. Each bullet is a full sentence (15-30 words) with specific data, citations, or technical depth.
+DIAGRAM: Include diagram_spec when relevant.`;
+    default: // medium
+      return `BULLET COUNT: 3-4 bullets. Each bullet is concise but informative (10-20 words) with at least one data point.
+DIAGRAM: Include diagram_spec when it adds clarity.`;
+  }
+}
+
 export async function generateSlide(params: {
   slide_context: any;
   per_slide_extracted_text_or_empty: string;
+  text_density?: string;
 }): Promise<{
   title: string;
   bullets: string[];
   notes: string;
   chart_spec: any;
+  diagram_spec?: any;
   citations: string[];
   image?: {
     prompt: string;
@@ -251,58 +267,58 @@ export async function generateSlide(params: {
     source: string;
   };
 }> {
-  const prompt = `You are an expert presentation designer creating engaging, professional slides.
+  const density = params.text_density || 'medium';
+  const bulletInstructions = getBulletInstructions(density);
+  const isChartSlide = params.slide_context.layout === 'chart';
 
-CRITICAL RULES FOR PROFESSIONAL CONTENT:
-1. **Use Bold Text**: Wrap key terms in **double asterisks** for emphasis
-   Example: "**AI-powered diagnostics** reduce errors by 40%"
+  const prompt = `You are an expert academic presentation designer creating professional, scholarly slides.
 
-2. **Specific Data**: Include real numbers, percentages, dates
-   Bad: "AI is growing fast"
-   Good: "**85% of hospitals** adopted AI by 2024"
+RULES:
+1. Use **double asterisks** around key terms for emphasis.
+2. Include specific numbers, percentages, or cited statistics wherever possible.
+3. NO emojis in titles or bullets.
+4. Titles should be specific and informative, not generic.
 
-3. **Visual Descriptions**: Add image details for EVERY slide
-   - Describe relevant diagrams, charts, icons, or photos
-   - Make it topic-specific and professional
-
-4. **Rich Speaker Notes**: 60-100 words with storytelling, examples, transitions
-
-5. **NO EMOJIS**: Do not use any emojis in titles or bullets. Keep it professional.
+${bulletInstructions}
 
 SLIDE TO GENERATE:
 Title: ${params.slide_context.title}
 Layout: ${params.slide_context.layout}
 Section: ${params.slide_context.section || 'Main Content'}
+DOCUMENT_FACTS: """${params.per_slide_extracted_text_or_empty || 'None'}"""
 
-DOCUMENT_FACTS: """${params.per_slide_extracted_text_or_empty}"""
-
-OUTPUT REQUIREMENTS:
-- title: Engaging, specific title (use **bold** for key words, NO emojis)
-- bullets: 3-5 bullets with bold text and specific data (NO emojis)
-- notes: Empty string (do not generate speaker notes)
-- image: Always include! Describe a relevant visual element
-  {
-    "prompt": "Detailed description of diagram/chart/icon that illustrates this slide's concept",
-    "alt": "Brief alt text",
-    "source": "placeholder"
-  }
-- chart_spec: If layout includes "chart", add chart data
-- citations: Empty array []
-
-Output JSON:
+${isChartSlide ? `CHART REQUIRED: Generate a chart_spec with realistic data relevant to the slide title.
+Chart spec format:
 {
-  "title": "**Bold Title** with Emphasis",
-  "bullets": [
-    "**Bold term**: specific detail with data",
-    "Another point with **emphasis** and numbers"
+  "type": "bar" | "line" | "pie" | "area",
+  "title": "Chart Title",
+  "labels": ["Label1", "Label2", ...],
+  "datasets": [
+    {"label": "Series Name", "data": [number, ...], "backgroundColor": ["#color", ...]}
   ],
+  "caption": "Brief description of what the chart shows"
+}` : `chart_spec: null (not a chart slide)`}
+
+DIAGRAM SPEC (for process flows, comparisons, hierarchies):
+If the slide content benefits from a visual diagram, include diagram_spec:
+{
+  "type": "flowchart" | "comparison" | "timeline" | "hierarchy" | "cycle",
+  "title": "Diagram Title",
+  "nodes": [{"id": "1", "label": "Step/Item", "description": "brief detail"}],
+  "edges": [{"from": "1", "to": "2", "label": "optional arrow label"}]
+}
+For "comparison": use {"type": "comparison", "left": {"title": "A", "items": ["..."]}, "right": {"title": "B", "items": ["..."]}}
+For "timeline": use {"type": "timeline", "events": [{"year": "2020", "label": "Event", "description": "..."}]}
+Set diagram_spec to null if not needed.
+
+OUTPUT JSON:
+{
+  "title": "**Specific Title** with Key Term",
+  "bullets": ["**Term**: detailed fact with number", "..."],
   "notes": "",
-  "image": {
-    "prompt": "Professional diagram showing...",
-    "alt": "Diagram of...",
-    "source": "placeholder"
-  },
-  "chart_spec": null,
+  "image": {"prompt": "Scholarly diagram or illustration of...", "alt": "...", "source": "placeholder"},
+  "chart_spec": null or {...},
+  "diagram_spec": null or {...},
   "citations": []
 }
 
@@ -321,27 +337,40 @@ Return ONLY valid JSON.`;
         source: generateUnsplashUrl(params.slide_context.title)
       };
     } else if (!parsed.image.source || parsed.image.source === 'placeholder') {
-      // Replace placeholder with real Unsplash image
       parsed.image.source = generateUnsplashUrl(params.slide_context.title);
     }
-    
+
+    if (!parsed.diagram_spec) parsed.diagram_spec = null;
+
     return parsed;
   } catch (error) {
     console.error('Slide generation failed:', error);
-    // Enhanced fallback with professional content
     const topic = params.slide_context.title || 'Key Concepts';
+    const density = params.text_density || 'medium';
+    const bullets = density === 'low'
+      ? [`**${topic}**: Core insight`, `**Impact**: Measurable outcome`]
+      : density === 'text_heavy'
+      ? [
+          `**Core Concept**: ${topic} represents a fundamental advancement in the field, with significant implications for practice and theory.`,
+          `**Key Metrics**: Quantitative analysis demonstrates measurable improvements across multiple dimensions of performance.`,
+          `**Methodology**: Rigorous systematic review of peer-reviewed literature supports these findings.`,
+          `**Applications**: Real-world deployment reveals both opportunities and constraints in current implementations.`,
+          `**Future Directions**: Emerging research suggests several promising avenues for further investigation.`
+        ]
+      : [
+          `**Core Concept**: ${topic} fundamentals`,
+          `**Key Metrics**: Measurable outcomes and benchmarks`,
+          `**Innovation**: Latest developments and breakthroughs`
+        ];
     return {
       title: `**${topic}**: Overview`,
-      bullets: [
-        `**Core Concept**: ${topic} fundamentals`,
-        `**Key Metrics**: Measurable outcomes`,
-        `**Innovation**: Latest developments`
-      ],
-      notes: '', // No speaker notes
+      bullets,
+      notes: '',
       chart_spec: null,
+      diagram_spec: null,
       citations: generateCitations(topic),
       image: {
-        prompt: `Modern infographic showing ${topic} with icons, arrows, and data visualizations in a clean, professional style`,
+        prompt: `Scholarly diagram showing ${topic} with clean, academic illustration style`,
         alt: `${topic} concept diagram`,
         source: generateUnsplashUrl(topic)
       }

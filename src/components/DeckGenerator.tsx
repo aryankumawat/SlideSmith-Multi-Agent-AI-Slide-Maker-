@@ -2,303 +2,229 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, FileText, Sparkles, Download } from 'lucide-react';
+import { Sparkles, FileText, AlignLeft, Layers, BookOpen, BarChart3 } from 'lucide-react';
 
-type Mode = 'quick_prompt' | 'doc_to_deck';
+type TextDensity = 'low' | 'medium' | 'text_heavy';
 
 interface DeckGeneratorProps {
   onGenerate: (data: any) => void;
   isLoading?: boolean;
 }
 
+const TEXT_DENSITY_OPTIONS: { value: TextDensity; label: string; desc: string; icon: React.ReactNode }[] = [
+  {
+    value: 'low',
+    label: 'Visual Focus',
+    desc: '1–2 impactful bullets per slide, diagram-heavy',
+    icon: <BarChart3 className="w-5 h-5" />,
+  },
+  {
+    value: 'medium',
+    label: 'Balanced',
+    desc: '3–4 bullets per slide, charts + text',
+    icon: <Layers className="w-5 h-5" />,
+  },
+  {
+    value: 'text_heavy',
+    label: 'Text-Heavy',
+    desc: '5–7 detailed bullets, academic depth',
+    icon: <AlignLeft className="w-5 h-5" />,
+  },
+];
+
 export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGeneratorProps) {
-  const [mode, setMode] = useState<Mode>('quick_prompt');
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [formData, setFormData] = useState({
     topic_or_prompt: '',
-    instructions: '',
-    tone: 'professional',
+    tone: 'academic',
     audience: 'general',
     slide_count: 10,
-    theme: 'deep_space',
+    theme: 'academic',
+    text_density: 'medium' as TextDensity,
     live_widgets: false,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const requestData = {
-      mode,
-      ...formData,
-      assets: mode === 'doc_to_deck' ? {
-        doc_urls: [], // TODO: Implement file upload
-        image_urls: [],
-        xlsx_urls: []
-      } : undefined
-    };
-    
-    onGenerate(requestData);
+    onGenerate({ mode: 'quick_prompt', ...formData });
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setUploadedFiles(prev => [...prev, ...files]);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    setUploadedFiles(prev => [...prev, ...files]);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-  };
+  const set = (field: string, value: any) =>
+    setFormData(prev => ({ ...prev, [field]: value }));
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-          SlideSmith
-        </h1>
-        <p className="text-xl text-gray-600">
-          Transform any idea into a stunning presentation
-        </p>
-      </div>
-
-      <Tabs value={mode} onValueChange={(value) => setMode(value as Mode)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8">
-          <TabsTrigger value="quick_prompt" className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4" />
-            Quick Prompt
-          </TabsTrigger>
-          <TabsTrigger value="doc_to_deck" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Document → Deck
-          </TabsTrigger>
-        </TabsList>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-4 uppercase tracking-widest">
+            <BookOpen className="w-3.5 h-3.5" />
+            Multi-Agent AI • Powered by Ollama
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-3">
+            Slide<span className="text-blue-600">Smith</span>
+          </h1>
+          <p className="text-slate-500 text-lg max-w-md mx-auto">
+            Describe your topic, set your parameters, and get a professional presentation in minutes.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {mode === 'quick_prompt' ? 'Quick Prompt Mode' : 'Document to Deck Mode'}
+          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl text-slate-800 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-500" />
+                Generate Presentation
               </CardTitle>
-              <CardDescription>
-                {mode === 'quick_prompt' 
-                  ? 'Describe your presentation in one prompt and get a complete deck'
-                  : 'Upload documents and convert them into a presentation'
-                }
-              </CardDescription>
+              <CardDescription>Fill in the details below to create your deck</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {mode === 'quick_prompt' ? (
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="topic_or_prompt" className="block text-sm font-medium mb-2">
-                      Presentation Prompt *
-                    </label>
-                    <Textarea
-                      id="topic_or_prompt"
-                      placeholder="e.g., 'Create a 10-slide deck on climate change economics for executives. Formal tone. Add one chart comparing carbon pricing models.'"
-                      value={formData.topic_or_prompt}
-                      onChange={(e) => handleInputChange('topic_or_prompt', e.target.value)}
-                      className="min-h-[100px]"
-                      required
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Upload Documents
-                    </label>
-                    <div 
-                      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                        isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      onDrop={handleDrop}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onClick={() => document.getElementById('file-upload')?.click()}
-                    >
-                      <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                      <p className="text-gray-600 mb-2">Drop your files here or click to browse</p>
-                      <p className="text-sm text-gray-500">Supports PDF, DOCX, MD, XLSX, PPTX</p>
-                      <input
-                        id="file-upload"
-                        type="file"
-                        multiple
-                        accept=".pdf,.docx,.md,.xlsx,.pptx,.doc,.txt"
-                        className="hidden"
-                        onChange={handleFileSelect}
-                      />
-                    </div>
-                    
-                    {uploadedFiles.length > 0 && (
-                      <div className="mt-4 space-y-2">
-                        {uploadedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-100 rounded">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-gray-500" />
-                              <span className="text-sm">{file.name}</span>
-                              <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                removeFile(index);
-                              }}
-                            >
-                              ✕
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label htmlFor="instructions" className="block text-sm font-medium mb-2">
-                      Instructions (Optional)
-                    </label>
-                    <Textarea
-                      id="instructions"
-                      placeholder="e.g., 'Follow my section headings as slides; compress bullets; add 1 chart from table 2'"
-                      value={formData.instructions}
-                      onChange={(e) => handleInputChange('instructions', e.target.value)}
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                </div>
-              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-6 pt-4">
+              {/* Prompt */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  What is your presentation about? <span className="text-red-500">*</span>
+                </label>
+                <Textarea
+                  placeholder="e.g., 'The impact of machine learning on drug discovery — include pharmacokinetics data, clinical trial stages, and regulatory pathways for a graduate audience.'"
+                  value={formData.topic_or_prompt}
+                  onChange={e => set('topic_or_prompt', e.target.value)}
+                  className="min-h-[110px] resize-none text-sm border-slate-200 focus:border-blue-400"
+                  required
+                />
+              </div>
+
+              {/* Row: slides + theme */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="tone" className="block text-sm font-medium mb-2">
-                    Tone
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Number of Slides
                   </label>
-                  <Select value={formData.tone} onValueChange={(value) => handleInputChange('tone', value)}>
-                    <SelectTrigger>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={4}
+                      max={30}
+                      step={1}
+                      value={formData.slide_count}
+                      onChange={e => set('slide_count', parseInt(e.target.value))}
+                      className="flex-1 accent-blue-600"
+                    />
+                    <span className="w-8 text-center font-bold text-blue-700 text-sm">
+                      {formData.slide_count}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">4 – 30 slides</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Theme</label>
+                  <Select value={formData.theme} onValueChange={v => set('theme', v)}>
+                    <SelectTrigger className="border-slate-200">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="academic">Academic (Light)</SelectItem>
+                      <SelectItem value="corporate">Corporate Blue</SelectItem>
+                      <SelectItem value="deep_space">Deep Space (Dark)</SelectItem>
+                      <SelectItem value="ultra_violet">Ultra Violet (Dark)</SelectItem>
+                      <SelectItem value="navy_gold">Navy & Gold</SelectItem>
+                      <SelectItem value="minimal">Minimal White</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row: tone + audience */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Tone</label>
+                  <Select value={formData.tone} onValueChange={v => set('tone', v)}>
+                    <SelectTrigger className="border-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
                       <SelectItem value="academic">Academic</SelectItem>
+                      <SelectItem value="professional">Professional</SelectItem>
                       <SelectItem value="persuasive">Persuasive</SelectItem>
+                      <SelectItem value="casual">Casual</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <label htmlFor="audience" className="block text-sm font-medium mb-2">
-                    Audience
-                  </label>
-                  <Select value={formData.audience} onValueChange={(value) => handleInputChange('audience', value)}>
-                    <SelectTrigger>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Audience</label>
+                  <Select value={formData.audience} onValueChange={v => set('audience', v)}>
+                    <SelectTrigger className="border-slate-200">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="general">General</SelectItem>
                       <SelectItem value="executives">Executives</SelectItem>
-                      <SelectItem value="technical">Technical</SelectItem>
-                      <SelectItem value="students">Students</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label htmlFor="slide_count" className="block text-sm font-medium mb-2">
-                    Slide Count
-                  </label>
-                  <Input
-                    id="slide_count"
-                    type="number"
-                    min="3"
-                    max="50"
-                    value={formData.slide_count}
-                    onChange={(e) => handleInputChange('slide_count', parseInt(e.target.value))}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="theme" className="block text-sm font-medium mb-2">
-                    Theme
-                  </label>
-                  <Select value={formData.theme} onValueChange={(value) => handleInputChange('theme', value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="deep_space">Deep Space</SelectItem>
-                      <SelectItem value="ultra_violet">Ultra Violet</SelectItem>
-                      <SelectItem value="minimal">Minimal</SelectItem>
-                      <SelectItem value="corporate">Corporate</SelectItem>
+                      <SelectItem value="technical">Technical / Engineering</SelectItem>
+                      <SelectItem value="students">Students / Academic</SelectItem>
+                      <SelectItem value="researchers">Researchers</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="live_widgets"
-                  checked={formData.live_widgets}
-                  onCheckedChange={(checked) => handleInputChange('live_widgets', checked)}
-                />
-                <label htmlFor="live_widgets" className="text-sm font-medium">
-                  Enable Live Widgets
+              {/* Text Density */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  Content Density
                 </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {TEXT_DENSITY_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => set('text_density', opt.value)}
+                      className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                        formData.text_density === opt.value
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-slate-200 hover:border-blue-300 bg-white'
+                      }`}
+                    >
+                      <div className={`mb-1.5 ${formData.text_density === opt.value ? 'text-blue-600' : 'text-slate-400'}`}>
+                        {opt.icon}
+                      </div>
+                      <div className={`text-xs font-semibold ${formData.text_density === opt.value ? 'text-blue-700' : 'text-slate-700'}`}>
+                        {opt.label}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5 leading-tight">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                size="lg"
-                disabled={isLoading || (!formData.topic_or_prompt && mode === 'quick_prompt')}
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-base shadow-md"
+                disabled={isLoading || !formData.topic_or_prompt.trim()}
               >
                 {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Generating Presentation...
-                  </>
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Generating — this may take a few minutes…
+                  </span>
                 ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-2" />
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5" />
                     Generate Presentation
-                  </>
+                  </span>
                 )}
               </Button>
+
+              <p className="text-xs text-slate-400 text-center">
+                Uses Ollama locally • No data leaves your machine
+              </p>
             </CardContent>
           </Card>
         </form>
-      </Tabs>
+      </div>
     </div>
   );
 }

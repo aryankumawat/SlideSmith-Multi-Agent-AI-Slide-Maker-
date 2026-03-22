@@ -17,9 +17,10 @@ const GenerateDeckRequestSchema = z.object({
   topic_or_prompt: z.string().optional(),
   instructions: z.string().optional(),
   tone: z.enum(['professional', 'casual', 'academic', 'persuasive']).default('professional'),
-  audience: z.enum(['general', 'executives', 'technical', 'students']).default('general'),
+  audience: z.enum(['general', 'executives', 'technical', 'students', 'researchers']).default('general'),
   slide_count: z.number().min(3).max(50).default(10),
-  theme: z.enum(['deep_space', 'ultra_violet', 'minimal', 'corporate']).default('deep_space'),
+  theme: z.enum(['deep_space', 'ultra_violet', 'minimal', 'corporate', 'academic', 'navy_gold']).default('academic'),
+  text_density: z.enum(['low', 'medium', 'text_heavy']).default('medium'),
   live_widgets: z.boolean().default(false),
   assets: z.object({
     doc_urls: z.array(z.string()).optional(),
@@ -41,6 +42,7 @@ export type Slide = {
   bullets?: string[];
   notes?: string;
   chart_spec?: ChartSpec | null;
+  diagram_spec?: any | null;
   image?: { prompt: string; alt: string; source: 'generated' | 'uploaded' | 'url' };
   citations?: string[];
 };
@@ -61,7 +63,7 @@ export type GenerateDeckResponse = {
 };
 
 // Theme tokens
-const themes = {
+const themes: Record<string, { bg: string; surface: string; primary: string; accent: string; text: string; muted: string; font: string; image_style: string }> = {
   deep_space: {
     bg: '#0B0F1A',
     surface: '#101828',
@@ -101,6 +103,26 @@ const themes = {
     muted: '#6B7280',
     font: 'Inter, system-ui, -apple-system',
     image_style: 'professional, clean, corporate blue accents'
+  },
+  academic: {
+    bg: '#FAFAFA',
+    surface: '#FFFFFF',
+    primary: '#1A3A5C',
+    accent: '#C0392B',
+    text: '#1A1A1A',
+    muted: '#5A6A7A',
+    font: 'Georgia, "Times New Roman", serif',
+    image_style: 'scholarly, clean white background, academic diagrams, scientific illustrations'
+  },
+  navy_gold: {
+    bg: '#0A1628',
+    surface: '#0F2040',
+    primary: '#F4C430',
+    accent: '#E8A020',
+    text: '#F0F4F8',
+    muted: '#8EA8C3',
+    font: 'Georgia, "Palatino Linotype", serif',
+    image_style: 'prestigious, navy and gold, formal, institutional'
   }
 };
 
@@ -117,6 +139,7 @@ export async function POST(request: NextRequest) {
       audience: validatedData.audience,
       tone: validatedData.tone,
       theme: validatedData.theme,
+      text_density: validatedData.text_density,
       live_widgets: validatedData.live_widgets
     };
     
@@ -184,7 +207,8 @@ export async function POST(request: NextRequest) {
           const draft = await Promise.race([
             generateSlide({
               slide_context: slot,
-              per_slide_extracted_text_or_empty: perSlideFacts
+              per_slide_extracted_text_or_empty: perSlideFacts,
+              text_density: meta.text_density
             }),
             new Promise<never>((_, reject) => 
               setTimeout(() => reject(new Error(`Slide generation timed out for: ${slot.title}`)), 30000)
@@ -196,11 +220,12 @@ export async function POST(request: NextRequest) {
             withChart = attachChartSpec(draft, tableForTitle(docSummary, slot.title));
           }
           
+          const themeConfig = themes[meta.theme] || themes['academic'];
           const visual = await Promise.race([
             generateVisual({
               title: draft.title,
               bullets: draft.bullets,
-              theme_style: themes[meta.theme].image_style
+              theme_style: themeConfig.image_style
             }),
             new Promise<never>((_, reject) => 
               setTimeout(() => reject(new Error('Visual generation timed out')), 10000)
@@ -208,11 +233,12 @@ export async function POST(request: NextRequest) {
           ]);
           
           slides.push({
-            layout: slot.layout,
+            layout: slot.layout as Slide['layout'],
             title: draft.title,
             bullets: draft.bullets,
             notes: draft.notes,
             chart_spec: withChart.chart_spec || null,
+            diagram_spec: draft.diagram_spec || null,
             image: { prompt: visual.prompt, alt: visual.alt, source: 'generated' },
             citations: draft.citations || []
           });
@@ -220,7 +246,7 @@ export async function POST(request: NextRequest) {
           console.error(`[Generate Deck API] Error generating slide ${currentSlide}:`, slideError);
           // Continue with fallback slide instead of failing completely
           slides.push({
-            layout: slot.layout,
+            layout: slot.layout as Slide['layout'],
             title: slot.title,
             bullets: ['Content generation in progress...'],
             notes: 'This slide content is being generated.',
@@ -258,9 +284,9 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid request data',
-          details: error.errors.map(e => ({
+          details: error.issues.map((e: any) => ({
             field: e.path.join('.'),
             message: e.message,
           })),

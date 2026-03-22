@@ -4,8 +4,9 @@ import { useState } from 'react';
 import DeckGenerator from '@/components/DeckGenerator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Eye, Share } from 'lucide-react';
 import { ChartDisplay } from '@/components/ChartDisplay';
+import { DiagramDisplay } from '@/components/DiagramDisplay';
+import { Download, RefreshCw, BookOpen, BarChart2, Network, FileText } from 'lucide-react';
 
 interface Slide {
   layout: 'title' | 'title_bullets' | 'two_column' | 'quote' | 'chart' | 'image_full';
@@ -13,6 +14,7 @@ interface Slide {
   bullets?: string[];
   notes?: string;
   chart_spec?: any;
+  diagram_spec?: any;
   image?: { prompt: string; alt: string; source: string };
   citations?: string[];
 }
@@ -23,6 +25,167 @@ interface Deck {
   slides: Slide[];
 }
 
+// ─── Theme configs ─────────────────────────────────────────────────────────────
+const THEME_CONFIGS: Record<string, {
+  card: string; header: string; title: string; text: string;
+  bullet: string; badge: string; number: string;
+  accent: string; bg: string;
+}> = {
+  academic: {
+    bg: 'bg-slate-50',
+    card: 'bg-white border border-slate-200 hover:shadow-lg',
+    header: 'bg-gradient-to-r from-slate-800 to-slate-700',
+    title: 'text-white',
+    text: 'text-slate-700',
+    bullet: 'text-slate-600',
+    badge: 'bg-blue-50 text-blue-700 border border-blue-200',
+    number: 'bg-slate-800 text-white',
+    accent: 'text-red-600',
+  },
+  corporate: {
+    bg: 'bg-blue-50',
+    card: 'bg-white border border-blue-100 hover:shadow-lg',
+    header: 'bg-gradient-to-r from-blue-700 to-indigo-700',
+    title: 'text-white',
+    text: 'text-slate-700',
+    bullet: 'text-slate-600',
+    badge: 'bg-blue-50 text-blue-700 border border-blue-200',
+    number: 'bg-blue-700 text-white',
+    accent: 'text-blue-600',
+  },
+  deep_space: {
+    bg: 'bg-slate-950',
+    card: 'bg-slate-900 border border-slate-700 hover:shadow-2xl hover:shadow-violet-900/20',
+    header: 'bg-gradient-to-r from-violet-700 to-indigo-700',
+    title: 'text-white',
+    text: 'text-slate-300',
+    bullet: 'text-slate-400',
+    badge: 'bg-violet-900/40 text-violet-300 border border-violet-700',
+    number: 'bg-violet-700 text-white',
+    accent: 'text-cyan-400',
+  },
+  ultra_violet: {
+    bg: 'bg-slate-950',
+    card: 'bg-purple-950/80 border border-purple-700 hover:shadow-2xl hover:shadow-purple-900/30',
+    header: 'bg-gradient-to-r from-purple-700 to-fuchsia-700',
+    title: 'text-white',
+    text: 'text-purple-200',
+    bullet: 'text-purple-300',
+    badge: 'bg-purple-900/40 text-purple-300 border border-purple-700',
+    number: 'bg-purple-700 text-white',
+    accent: 'text-cyan-400',
+  },
+  navy_gold: {
+    bg: 'bg-slate-950',
+    card: 'bg-[#0F2040] border border-yellow-700/40 hover:shadow-xl hover:shadow-yellow-900/20',
+    header: 'bg-gradient-to-r from-[#0A1628] to-[#0F2040]',
+    title: 'text-yellow-400',
+    text: 'text-slate-200',
+    bullet: 'text-slate-300',
+    badge: 'bg-yellow-900/30 text-yellow-300 border border-yellow-700/50',
+    number: 'bg-yellow-600 text-slate-900',
+    accent: 'text-yellow-400',
+  },
+  minimal: {
+    bg: 'bg-gray-50',
+    card: 'bg-white border border-gray-200 hover:shadow-md',
+    header: 'bg-gray-100 border-b border-gray-200',
+    title: 'text-gray-900',
+    text: 'text-gray-700',
+    bullet: 'text-gray-600',
+    badge: 'bg-gray-100 text-gray-600 border border-gray-200',
+    number: 'bg-gray-200 text-gray-700',
+    accent: 'text-blue-600',
+  },
+};
+
+const getTheme = (theme: string) =>
+  THEME_CONFIGS[theme] || THEME_CONFIGS['academic'];
+
+// ─── Markdown bold renderer ────────────────────────────────────────────────────
+function renderBold(text: string, accentClass: string) {
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className={`font-semibold ${accentClass}`}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+// ─── Slide Card ───────────────────────────────────────────────────────────────
+function SlideCard({ slide, index, theme }: { slide: Slide; index: number; theme: string }) {
+  const t = getTheme(theme);
+  const hasChart = !!slide.chart_spec;
+  const hasDiagram = !!slide.diagram_spec;
+  const hasBullets = slide.bullets && slide.bullets.length > 0;
+
+  return (
+    <Card className={`overflow-hidden transition-all duration-200 ${t.card}`}>
+      {/* Header */}
+      <div className={`${t.header} px-4 py-3 flex items-start gap-3`}>
+        <span className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${t.number}`}>
+          {index + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          <h3 className={`text-sm font-semibold leading-snug ${t.title}`}>
+            {renderBold(slide.title, t.accent)}
+          </h3>
+          {/* Badges */}
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {hasChart && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${t.badge} flex items-center gap-1`}>
+                <BarChart2 className="w-2.5 h-2.5" /> Chart
+              </span>
+            )}
+            {hasDiagram && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${t.badge} flex items-center gap-1`}>
+                <Network className="w-2.5 h-2.5" /> Diagram
+              </span>
+            )}
+            {!hasChart && !hasDiagram && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${t.badge} flex items-center gap-1`}>
+                <FileText className="w-2.5 h-2.5" />
+                {slide.layout?.replace(/_/g, ' ') || 'content'}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <CardContent className="p-4 space-y-3">
+        {/* Bullets */}
+        {hasBullets && (
+          <ul className="space-y-2">
+            {slide.bullets!.map((bullet, bi) => (
+              <li key={bi} className="flex items-start gap-2">
+                <span className={`mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full ${t.accent.replace('text-', 'bg-').replace('/', '-')}`}
+                  style={{ backgroundColor: 'currentColor' }}
+                />
+                <span className={`text-xs leading-relaxed ${t.bullet}`}>
+                  {renderBold(bullet, t.accent)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Chart */}
+        {hasChart && (
+          <ChartDisplay chartSpec={slide.chart_spec} compact={true} className="mt-1" />
+        )}
+
+        {/* Diagram */}
+        {hasDiagram && (
+          <DiagramDisplay diagramSpec={slide.diagram_spec} compact={true} className="mt-1" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function StudioNewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedDeck, setGeneratedDeck] = useState<Deck | null>(null);
@@ -31,368 +194,174 @@ export default function StudioNewPage() {
   const handleGenerate = async (data: any) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      // Create an AbortController for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
-      
+      const timeoutId = setTimeout(() => controller.abort(), 420000); // 7 min
+
       const response = await fetch('/api/generate-deck', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
         signal: controller.signal,
       });
-      
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        const errorMessage = errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`;
-        throw new Error(errorMessage);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}`);
       }
 
       const result = await response.json();
-      if (!result.deck) {
-        throw new Error('Invalid response: deck not found in response');
-      }
+      if (!result.deck) throw new Error('Invalid response: deck not found');
       setGeneratedDeck(result.deck);
     } catch (err) {
-      console.error('Generation error:', err);
-      let errorMessage = 'An error occurred';
-      
-      if (err instanceof Error) {
-        if (err.name === 'AbortError') {
-          errorMessage = 'Request timed out. The generation is taking too long. Please try again or check if your LLM service is running.';
-        } else {
-          errorMessage = err.message;
-        }
-      }
-      
-      setError(errorMessage);
+      const msg = err instanceof Error
+        ? (err.name === 'AbortError' ? 'Request timed out — is Ollama running?' : err.message)
+        : 'An unknown error occurred';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Helper to strip markdown formatting for clean exports
-  const stripMarkdown = (text: string): string => {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
-      .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
-      .replace(/__(.*?)__/g, '$1')       // Remove __bold__
-      .replace(/_(.*?)_/g, '$1')         // Remove _italic_
-      .trim();
-  };
-
-  const convertDeckForExport = (deck: Deck) => {
-    // Convert new deck format to old format expected by export APIs
-    // Strip markdown formatting for clean text in exports
-    return {
-      id: `deck-${Date.now()}`,
-      title: stripMarkdown(deck.title),
-      theme: deck.theme,
-      meta: {
-        title: stripMarkdown(deck.title),
-        theme: deck.theme,
-        audience: 'general',
-        tone: 'professional',
-      },
-      slides: deck.slides.map((slide, index) => {
-        const blocks: any[] = [];
-        
-        // Add title as Heading block (strip markdown)
-        if (slide.title) {
-          blocks.push({
-            type: 'Heading',
-            text: stripMarkdown(slide.title),
-            level: 1,
-          });
-        }
-        
-        // Add bullets as Bullets block (strip markdown from each bullet)
-        if (slide.bullets && slide.bullets.length > 0) {
-          blocks.push({
-            type: 'Bullets',
-            items: slide.bullets.map(bullet => stripMarkdown(bullet)),
-          });
-        }
-        
-        // Add chart if present
-        if (slide.chart_spec) {
-          blocks.push({
-            type: 'Chart',
-            chartSpec: slide.chart_spec,
-          });
-        }
-        
-        // Add image if present
-        if (slide.image) {
-          blocks.push({
-            type: 'Image',
-            url: slide.image.source || '',
-            alt: stripMarkdown(slide.image.alt),
-            caption: stripMarkdown(slide.image.prompt),
-          });
-        }
-        
-        return {
-          id: `slide-${index}`,
-          layout: slide.layout || 'title-content',
-          blocks,
-          notes: slide.notes || '',
-          citations: slide.citations || [],
-        };
-      }),
-    };
-  };
+  const stripMarkdown = (text: string) =>
+    text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').trim();
 
   const handleExport = async (format: 'pptx' | 'pdf' | 'json') => {
     if (!generatedDeck) return;
-    
+
     if (format === 'json') {
-      // Download JSON with markdown stripped for clean text
-      const cleanedDeck = {
-        ...generatedDeck,
-        title: stripMarkdown(generatedDeck.title),
-        slides: generatedDeck.slides.map(slide => ({
-          ...slide,
-          title: stripMarkdown(slide.title),
-          bullets: slide.bullets?.map(bullet => stripMarkdown(bullet)) || [],
-          image: slide.image ? {
-            ...slide.image,
-            alt: stripMarkdown(slide.image.alt),
-            prompt: stripMarkdown(slide.image.prompt)
-          } : undefined
-        }))
-      };
-      
-      const blob = new Blob([JSON.stringify(cleanedDeck, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(generatedDeck, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${stripMarkdown(generatedDeck.title) || 'presentation'}.json`;
-      document.body.appendChild(a);
+      a.download = `${stripMarkdown(generatedDeck.title)}.json`;
       a.click();
-      document.body.removeChild(a);
       URL.revokeObjectURL(url);
       return;
     }
-    
+
     try {
       const endpoint = format === 'pptx' ? '/api/export/pptx' : '/api/export/pdf';
-      
-      // PPTX uses the new format directly (advanced exporter expects it)
-      // PDF uses the old blocks format (legacy exporter expects it)
-      const deckToExport = format === 'pptx' ? generatedDeck : convertDeckForExport(generatedDeck);
-      
+      const deckToExport = format === 'pptx' ? generatedDeck : convertDeckForPdf(generatedDeck);
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deck: deckToExport }),
       });
 
       if (!response.ok) {
-        // Get error details from response
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error(`Export ${format} failed:`, response.status, errorData);
-        throw new Error(`Failed to export ${format.toUpperCase()}: ${errorData.error || response.statusText}`);
+        const err = await response.json().catch(() => ({ error: 'Unknown' }));
+        throw new Error(err.error || response.statusText);
       }
 
-      // Get the blob and download it
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${generatedDeck.title || 'presentation'}.${format}`;
-      document.body.appendChild(a);
+      a.download = `${stripMarkdown(generatedDeck.title)}.${format}`;
       a.click();
-      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error(`Export failed:`, error);
-      setError(`Failed to export as ${format.toUpperCase()}. Please try again.`);
+    } catch (err) {
+      setError(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto py-8">
-        {!generatedDeck ? (
-          <div className="space-y-4">
-            {error && (
-              <Card className="border-red-200 bg-red-50">
-                <CardContent className="pt-6">
-                  <p className="text-red-600 font-medium">Error: {error}</p>
-                  <p className="text-sm text-red-500 mt-2">
-                    {error.includes('Ollama') && 'Make sure Ollama is running: `ollama serve` or check your LLM configuration.'}
-                    {error.includes('timeout') && 'The request took too long. Try reducing the slide count or check your LLM service.'}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-            <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold">{generatedDeck.title}</h1>
-                <p className="text-gray-600">Theme: {generatedDeck.theme}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setGeneratedDeck(null)}>
-                  Generate New
-                </Button>
-                <Button onClick={() => handleExport('pptx')}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export PPTX
-                </Button>
-                <Button variant="outline" onClick={() => handleExport('pdf')}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export PDF
-                </Button>
-              </div>
+  const convertDeckForPdf = (deck: Deck) => ({
+    id: `deck-${Date.now()}`,
+    title: stripMarkdown(deck.title),
+    theme: deck.theme,
+    meta: { title: stripMarkdown(deck.title), theme: deck.theme, audience: 'general', tone: 'professional' },
+    slides: deck.slides.map((slide, index) => ({
+      id: `slide-${index}`,
+      layout: slide.layout || 'title-content',
+      blocks: [
+        { type: 'Heading', text: stripMarkdown(slide.title), level: 1 },
+        ...(slide.bullets?.length ? [{ type: 'Bullets', items: slide.bullets.map(stripMarkdown) }] : []),
+        ...(slide.chart_spec ? [{ type: 'Chart', chartSpec: slide.chart_spec }] : []),
+      ],
+      notes: slide.notes || '',
+      citations: slide.citations || [],
+    })),
+  });
+
+  const t = getTheme(generatedDeck?.theme || 'academic');
+
+  // ─── Generator view ──────────────────────────────────────────────────────────
+  if (!generatedDeck) {
+    return (
+      <div>
+        {error && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-lg w-full px-4">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg">
+              <p className="text-sm font-semibold text-red-700">Generation Failed</p>
+              <p className="text-sm text-red-600 mt-1">{error}</p>
+              {error.includes('Ollama') && (
+                <p className="text-xs text-red-400 mt-1">Run: <code className="bg-red-100 px-1 rounded">ollama serve</code></p>
+              )}
             </div>
-
-            {/* Error Display */}
-            {error && (
-              <Card className="border-red-200 bg-red-50">
-                <CardContent className="pt-6">
-                  <p className="text-red-600">{error}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Slides Preview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {generatedDeck.slides.map((slide, index) => {
-                // Helper function to render text with bold markdown
-                const renderMarkdown = (text: string) => {
-                  const parts = text.split(/(\*\*.*?\*\*)/g);
-                  return parts.map((part, i) => {
-                    if (part.startsWith('**') && part.endsWith('**')) {
-                      return <strong key={i} className="text-blue-600 font-semibold">{part.slice(2, -2)}</strong>;
-                    }
-                    return <span key={i}>{part}</span>;
-                  });
-                };
-
-                // Get theme-based styling with better contrast for headings
-                const getThemeClasses = () => {
-                  const theme = generatedDeck.theme;
-                  switch (theme) {
-                    case 'deep_space':
-                      return {
-                        card: 'bg-gradient-to-br from-slate-900 to-blue-900 border-blue-500',
-                        header: 'bg-gradient-to-r from-blue-600 to-purple-600',
-                        accent: 'text-white' // White for dark backgrounds
-                      };
-                    case 'ultra_violet':
-                      return {
-                        card: 'bg-gradient-to-br from-purple-900 to-pink-900 border-purple-500',
-                        header: 'bg-gradient-to-r from-purple-600 to-fuchsia-600',
-                        accent: 'text-white' // White for dark backgrounds
-                      };
-                    case 'minimal':
-                      return {
-                        card: 'bg-white border-gray-300',
-                        header: 'bg-gray-100',
-                        accent: 'text-gray-900' // Dark for light backgrounds
-                      };
-                    case 'corporate':
-                      return {
-                        card: 'bg-gradient-to-br from-slate-50 to-blue-50 border-blue-300',
-                        header: 'bg-gradient-to-r from-blue-500 to-indigo-500',
-                        accent: 'text-white' // White for colored headers
-                      };
-                    default:
-                      return {
-                        card: 'bg-white border-gray-200',
-                        header: 'bg-gradient-to-r from-blue-50 to-purple-50',
-                        accent: 'text-gray-900' // Dark for light backgrounds
-                      };
-                  }
-                };
-
-                const themeClasses = getThemeClasses();
-
-                return (
-                  <Card key={index} className={`h-auto min-h-64 overflow-hidden border-2 hover:shadow-xl transition-all ${themeClasses.card}`}>
-                    <CardHeader className={`pb-3 ${themeClasses.header}`}>
-                      <CardTitle className={`text-base font-semibold leading-tight ${themeClasses.accent}`}>
-                        {renderMarkdown(slide.title)}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                      <div className="space-y-3">
-                        {/* Bullets with emoji and bold support */}
-                        {slide.bullets && slide.bullets.length > 0 && (
-                          <ul className="text-sm space-y-2">
-                            {slide.bullets.map((bullet, bulletIndex) => (
-                              <li key={bulletIndex} className="flex items-start gap-2">
-                                <span className="text-gray-400 shrink-0 mt-0.5">▸</span>
-                                <span className="leading-relaxed">
-                                  {renderMarkdown(bullet)}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        
-                        {/* Image/Visual indicator with icon (compact) */}
-                        {slide.image && (
-                          <div className="mt-2 p-2 bg-gradient-to-br from-purple-50 to-pink-50 rounded border border-purple-200">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">🎨</span>
-                              <strong className="text-xs text-purple-700">Visual: {slide.image.alt || 'Diagram included'}</strong>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Chart visualization */}
-                        {slide.chart_spec && (
-                          <ChartDisplay chartSpec={slide.chart_spec} className="mt-3" />
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Export Options */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Export Options</CardTitle>
-                <CardDescription>
-                  Download your presentation in various formats
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <Button onClick={() => handleExport('pptx')} className="flex-1">
-                    <Download className="w-4 h-4 mr-2" />
-                    PowerPoint (PPTX)
-                  </Button>
-                  <Button variant="outline" onClick={() => handleExport('pdf')} className="flex-1">
-                    <Download className="w-4 h-4 mr-2" />
-                    PDF Document
-                  </Button>
-                  <Button variant="outline" onClick={() => handleExport('json')} className="flex-1">
-                    <Download className="w-4 h-4 mr-2" />
-                    JSON Data
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
+        <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
+      </div>
+    );
+  }
+
+  // ─── Deck view ───────────────────────────────────────────────────────────────
+  const chartCount = generatedDeck.slides.filter(s => s.chart_spec).length;
+  const diagramCount = generatedDeck.slides.filter(s => s.diagram_spec).length;
+
+  return (
+    <div className={`min-h-screen ${t.bg} py-8 px-4`}>
+      <div className="max-w-6xl mx-auto space-y-6">
+
+        {/* Deck header */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <BookOpen className="w-5 h-5 text-blue-500" />
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                {generatedDeck.theme.replace(/_/g, ' ')} Theme
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+              {renderBold(generatedDeck.title, 'text-blue-600')}
+            </h1>
+            <div className="flex gap-3 mt-2 text-sm text-slate-500">
+              <span>{generatedDeck.slides.length} slides</span>
+              {chartCount > 0 && <span>· {chartCount} charts</span>}
+              {diagramCount > 0 && <span>· {diagramCount} diagrams</span>}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => setGeneratedDeck(null)}
+              className="gap-2">
+              <RefreshCw className="w-4 h-4" /> New Deck
+            </Button>
+            <Button size="sm" onClick={() => handleExport('pptx')} className="gap-2 bg-blue-600 hover:bg-blue-700">
+              <Download className="w-4 h-4" /> Export PPTX
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => handleExport('pdf')} className="gap-2">
+              <Download className="w-4 h-4" /> Export PDF
+            </Button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        {/* Slides grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {generatedDeck.slides.map((slide, index) => (
+            <SlideCard key={index} slide={slide} index={index} theme={generatedDeck.theme} />
+          ))}
+        </div>
       </div>
     </div>
   );

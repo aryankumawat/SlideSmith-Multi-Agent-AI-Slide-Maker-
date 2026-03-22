@@ -3,194 +3,159 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Sparkles, Download, Share, Zap, Palette, BarChart3 } from 'lucide-react';
+import { ArrowRight, Sparkles, Download, Network, Zap, BookOpen, BarChart3, AlignLeft, Layers } from 'lucide-react';
+
+const features = [
+  {
+    icon: <Zap className="h-6 w-6" />,
+    color: 'bg-blue-100 text-blue-600',
+    title: 'Multi-Agent AI Pipeline',
+    desc: '13 specialized agents — researcher, structurer, fact-checker, and more — collaborate to build your deck.',
+  },
+  {
+    icon: <Network className="h-6 w-6" />,
+    color: 'bg-purple-100 text-purple-600',
+    title: 'Interactive Diagrams',
+    desc: 'Auto-generated flowcharts, timelines, comparison tables, cycle diagrams, and hierarchy charts.',
+  },
+  {
+    icon: <BarChart3 className="h-6 w-6" />,
+    color: 'bg-green-100 text-green-600',
+    title: 'Live Charts',
+    desc: 'Interactive bar, line, pie, area charts rendered with real data directly in your slides.',
+  },
+  {
+    icon: <BookOpen className="h-6 w-6" />,
+    color: 'bg-red-100 text-red-600',
+    title: 'Academic & Professional Themes',
+    desc: 'Choose from Academic, Corporate, Navy & Gold, Deep Space, Minimal, and Ultra Violet themes.',
+  },
+  {
+    icon: <AlignLeft className="h-6 w-6" />,
+    color: 'bg-orange-100 text-orange-600',
+    title: 'Text Density Control',
+    desc: 'Visual Focus (1–2 bullets), Balanced (3–4), or Text-Heavy (5–7) — you decide the depth.',
+  },
+  {
+    icon: <Download className="h-6 w-6" />,
+    color: 'bg-indigo-100 text-indigo-600',
+    title: 'PPTX & PDF Export',
+    desc: 'Export native PowerPoint files with editable charts, or high-quality PDFs — all locally processed.',
+  },
+];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      {/* Header */}
-      <header className="container mx-auto px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Nav */}
+      <header className="container mx-auto px-6 py-5">
         <nav className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Sparkles className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900 dark:text-white">SlideSmith</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-xl font-bold text-slate-900">SlideSmith</span>
           </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/studio-new">
-              <Button>Get Started</Button>
-            </Link>
-          </div>
+          <Link href="/studio-new">
+            <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
+              Open Studio <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </nav>
       </header>
 
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-            AI-Powered
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-              {' '}Slide Creation
+      {/* Hero */}
+      <section className="container mx-auto px-6 py-20 text-center">
+        <div className="max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-4 py-2 rounded-full mb-6 uppercase tracking-widest">
+            <BookOpen className="w-3.5 h-3.5" />
+            Powered by Ollama • Runs 100% Locally
+          </div>
+          <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight mb-5 leading-tight">
+            Academic-grade
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+              AI Presentations
             </span>
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-            Transform any topic into stunning, animated slide decks with live widgets, 
-            automatic theming, and seamless export to PDF or PPTX.
+          <p className="text-xl text-slate-500 mb-8 max-w-xl mx-auto leading-relaxed">
+            Enter a prompt, choose your slide count and content density. SlideSmith&apos;s 13-agent pipeline
+            generates charts, diagrams, and structured slides — all offline with Ollama.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/studio-new">
-              <Button size="lg" className="w-full sm:w-auto">
-                <Sparkles className="mr-2 h-5 w-5" />
-                Try It Now
+              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 gap-2 px-8 shadow-lg">
+                <Sparkles className="h-5 w-5" />
+                Start Creating
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="w-full sm:w-auto">
-              <Download className="mr-2 h-5 w-5" />
-              View Demo
-            </Button>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+      {/* Content Density Explainer */}
+      <section className="container mx-auto px-6 py-12">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-center text-2xl font-bold text-slate-800 mb-6">Content Density Options</h2>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { icon: <BarChart3 className="w-5 h-5" />, label: 'Visual Focus', sub: '1–2 bullets · diagram-heavy', color: 'border-blue-300 bg-blue-50' },
+              { icon: <Layers className="w-5 h-5" />, label: 'Balanced', sub: '3–4 bullets · charts + text', color: 'border-indigo-300 bg-indigo-50' },
+              { icon: <AlignLeft className="w-5 h-5" />, label: 'Text-Heavy', sub: '5–7 bullets · academic depth', color: 'border-purple-300 bg-purple-50' },
+            ].map(opt => (
+              <div key={opt.label} className={`rounded-xl border-2 p-4 text-center ${opt.color}`}>
+                <div className="flex justify-center mb-2 text-slate-600">{opt.icon}</div>
+                <div className="font-semibold text-slate-800 text-sm">{opt.label}</div>
+                <div className="text-xs text-slate-500 mt-1">{opt.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="container mx-auto px-6 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
             Everything you need for perfect presentations
           </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            From AI generation to live widgets, SlideSmith has all the tools you need.
+          <p className="text-lg text-slate-500 max-w-xl mx-auto">
+            Professional-grade tools, academic rigor, and zero cloud dependency.
           </p>
         </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mb-4">
-                <Zap className="h-6 w-6 text-blue-600" />
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {features.map(f => (
+            <div key={f.title} className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-md transition-shadow">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${f.color}`}>
+                {f.icon}
               </div>
-              <CardTitle>AI Generation</CardTitle>
-              <CardDescription>
-                Generate complete slide decks from any topic with intelligent content creation.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mb-4">
-                <Palette className="h-6 w-6 text-purple-600" />
-              </div>
-              <CardTitle>Beautiful Themes</CardTitle>
-              <CardDescription>
-                Choose from 5 stunning themes including DeepSpace, Ultraviolet, and more.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mb-4">
-                <BarChart3 className="h-6 w-6 text-green-600" />
-              </div>
-              <CardTitle>Live Widgets</CardTitle>
-              <CardDescription>
-                Add real-time charts, tickers, countdowns, maps, and more to your slides.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center mb-4">
-                <Download className="h-6 w-6 text-orange-600" />
-              </div>
-              <CardTitle>Export Options</CardTitle>
-              <CardDescription>
-                Download your presentations as PDF or PPTX with perfect formatting.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mb-4">
-                <Share className="h-6 w-6 text-red-600" />
-              </div>
-              <CardTitle>Easy Sharing</CardTitle>
-              <CardDescription>
-                Share your presentations via URL or save them locally for offline access.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mb-4">
-                <Sparkles className="h-6 w-6 text-indigo-600" />
-              </div>
-              <CardTitle>Smart Editing</CardTitle>
-              <CardDescription>
-                Edit slides inline with WYSIWYG editing and real-time preview.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+              <h3 className="font-semibold text-slate-900 mb-2">{f.title}</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Demo Section */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            See SlideSmith in action
-          </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Watch how easy it is to create professional presentations with AI.
-          </p>
-        </div>
-
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-8 text-center">
-            <div className="text-6xl mb-4">🎬</div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Demo Video Coming Soon
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              We're working on a comprehensive demo video that shows SlideSmith's capabilities.
-            </p>
-            <Link href="/studio-new">
-              <Button size="lg">
-                Try It Yourself
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-12 text-center text-white">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to create amazing presentations?
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of users who are already using SlideSmith to create stunning presentations.
+      {/* CTA */}
+      <section className="container mx-auto px-6 py-16">
+        <div className="max-w-4xl mx-auto bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-12 text-center text-white shadow-xl">
+          <h2 className="text-3xl font-bold mb-3">Ready to build your deck?</h2>
+          <p className="text-blue-100 mb-7 text-lg">
+            One prompt. Multiple agents. A presentation in minutes — entirely on your machine.
           </p>
           <Link href="/studio-new">
-            <Button size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
-              <Sparkles className="mr-2 h-5 w-5" />
-              Start Creating Now
+            <Button size="lg" className="bg-white text-blue-700 hover:bg-blue-50 gap-2 font-semibold px-8 shadow-md">
+              <Sparkles className="h-5 w-5" />
+              Open SlideSmith Studio
             </Button>
           </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-12 border-t border-gray-200 dark:border-gray-700">
-        <div className="text-center text-gray-600 dark:text-gray-400">
-          <p>&copy; 2024 SlideSmith.</p>
-        </div>
+      <footer className="container mx-auto px-6 py-8 border-t border-slate-200">
+        <p className="text-center text-sm text-slate-400">
+          &copy; {new Date().getFullYear()} SlideSmith · Built with Next.js, Ollama, Recharts
+        </p>
       </footer>
     </div>
   );
