@@ -1,39 +1,37 @@
-import { BaseAgent } from '../base-agent';
+import { BaseAgent, AgentConfig } from '../base-agent';
 import { ChartSpec, DataVizInput, DataVizOutput } from '../schemas';
 
-export interface DataVizPlannerConfig {
-  name: string;
-  description: string;
-  model: {
-    provider: 'ollama' | 'openai' | 'demo';
-    apiKey: string;
-    baseUrl: string;
-    model: string;
-    maxTokens: number;
-    temperature: number;
-  };
-}
+// ============================================================================
+// DATA VIZ PLANNER AGENT
+// ============================================================================
 
 export class DataVizPlannerAgent extends BaseAgent {
-  constructor(config: DataVizPlannerConfig) {
+  constructor() {
+    const config: AgentConfig = {
+      name: 'data-viz-planner',
+      description: 'Selects the best chart type and specification to answer an analytical question',
+      capabilities: ['data-analysis', 'chart-selection', 'visualization-planning'],
+      maxRetries: 3,
+      timeout: 30000,
+    };
     super(config);
   }
 
-  async execute(input: DataVizInput): Promise<DataVizOutput> {
+  async execute(input: DataVizInput, context?: unknown): Promise<DataVizOutput> {
     try {
-      console.log(`[${this.config.name}] Starting data visualization planning...`);
-      
-      const chartSpecs = await this.analyzeDataAndSuggestCharts(input);
+      console.log(`[${this.config.name}] Planning data visualizations...`);
+
+      const chartSpecs = await this.analyzeAndSuggestCharts(input);
       const rationale = await this.generateRationale(input, chartSpecs);
-      
+
       const output: DataVizOutput = {
         chartSpecs,
         rationale,
         metadata: {
           totalCharts: chartSpecs.length,
           dataTypes: this.extractDataTypes(input),
-          complexity: this.assessComplexity(chartSpecs)
-        }
+          complexity: this.assessComplexity(chartSpecs),
+        },
       };
 
       console.log(`[${this.config.name}] Generated ${chartSpecs.length} chart specifications`);
@@ -43,110 +41,104 @@ export class DataVizPlannerAgent extends BaseAgent {
     }
   }
 
-  private async analyzeDataAndSuggestCharts(input: DataVizInput): Promise<ChartSpec[]> {
+  private async analyzeAndSuggestCharts(input: DataVizInput): Promise<ChartSpec[]> {
     const prompt = this.buildChartAnalysisPrompt(input);
     const response = await this.callLLM(prompt);
-    return this.parseChartSpecs(response);
+    return this.parseChartSpecs(response.content);
   }
 
   private async generateRationale(input: DataVizInput, chartSpecs: ChartSpec[]): Promise<string> {
+    if (chartSpecs.length === 0) return 'No charts recommended for this section.';
     const prompt = this.buildRationalePrompt(input, chartSpecs);
     const response = await this.callLLM(prompt);
-    return response;
+    return response.content.trim();
   }
 
   private buildChartAnalysisPrompt(input: DataVizInput): string {
-    return `
-You are a data visualization expert. Analyze the provided data and suggest the most appropriate chart types.
+    return `You are a data visualization expert. Recommend the best chart type for this question.
 
-Data Context:
-- Question: ${input.analyticalQuestion}
-- Data Schema: ${JSON.stringify(input.dataSchema, null, 2)}
-- Sample Data: ${JSON.stringify(input.sampleData, null, 2)}
-- Slide Context: ${input.slideContext}
+Question: ${input.analyticalQuestion}
+Context: ${input.slideContext}
+Data schema: ${JSON.stringify(input.dataSchema)}
+Sample data: ${JSON.stringify(input.sampleData).slice(0, 500)}
 
-Guidelines:
-1. Choose the simplest chart that answers the question
-2. Prefer line charts for time series data
-3. Prefer bar charts for categorical comparisons
-4. Use pie charts only for parts of a whole (max 5-6 categories)
-5. Avoid dual-axis charts unless absolutely necessary
-6. Ensure clear axis labels and readable legends
+Rules:
+1. Simplest chart that answers the question
+2. Line charts for time series; bar for categories; pie only ≤6 parts
+3. No dual-axis unless unavoidable
+4. Maximum 2 chart suggestions
 
-For each suggested chart, provide:
-- kind: line, bar, area, pie, scatter, histogram
-- x: x-axis field name
-- y: y-axis field name
-- title: clear, descriptive title
-- rationale: one-sentence explanation
-- dataExample: small sample of the data structure
-
-Return as JSON array of chart specifications.
-`;
+Return JSON array only:
+[
+  {
+    "kind": "bar",
+    "x": "field_name",
+    "y": "field_name",
+    "title": "Descriptive Chart Title",
+    "xLabel": "X axis label",
+    "yLabel": "Y axis label",
+    "rationale": "one sentence why this chart",
+    "dataExample": [{"x": "A", "y": 10}]
+  }
+]`;
   }
 
   private buildRationalePrompt(input: DataVizInput, chartSpecs: ChartSpec[]): string {
-    return `
-Explain why these chart types were chosen for the data visualization:
+    return `Briefly explain (2 sentences) why these charts were chosen:
 
-Original Question: ${input.analyticalQuestion}
-Data Context: ${input.slideContext}
-
-Chosen Charts:
-${chartSpecs.map((spec, i) => `${i + 1}. ${spec.kind} chart: ${spec.title} - ${spec.rationale}`).join('\n')}
-
-Provide a concise explanation (2-3 sentences) of the overall visualization strategy.
-`;
+Question: ${input.analyticalQuestion}
+Charts: ${chartSpecs.map(s => `${s.kind} - ${s.title}`).join(', ')}`;
   }
 
-  private parseChartSpecs(response: string): ChartSpec[] {
+  private parseChartSpecs(content: string): ChartSpec[] {
     try {
-      const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const parsed = JSON.parse(cleaned);
-      
+
       if (Array.isArray(parsed)) {
-        return parsed.map(spec => ({
-          kind: spec.kind || 'bar',
-          x: spec.x || 'x',
-          y: spec.y || 'y',
-          title: spec.title || 'Chart',
-          rationale: spec.rationale || 'Data visualization',
-          dataExample: spec.dataExample || null
+        return parsed.map(s => ({
+          kind: s.kind || 'bar',
+          x: s.x || 'x',
+          y: s.y || 'y',
+          title: s.title || 'Chart',
+          xLabel: s.xLabel,
+          yLabel: s.yLabel,
+          rationale: s.rationale || 'Data visualization',
+          dataExample: s.dataExample || null,
         }));
       }
-      
+
       return [];
-    } catch (error) {
-      console.error('Failed to parse chart specs:', error);
-      return [{
-        kind: 'bar',
-        x: 'category',
-        y: 'value',
-        title: 'Data Overview',
-        rationale: 'Simple bar chart for data comparison',
-        dataExample: null
-      }];
+    } catch {
+      console.error(`[${this.config.name}] Failed to parse chart specs`);
+      return [
+        {
+          kind: 'bar',
+          x: 'category',
+          y: 'value',
+          title: 'Data Overview',
+          rationale: 'Bar chart for categorical comparison',
+          dataExample: null,
+        },
+      ];
     }
   }
 
   private extractDataTypes(input: DataVizInput): string[] {
     const types = new Set<string>();
-    
     if (input.dataSchema) {
       Object.values(input.dataSchema).forEach(field => {
-        if (typeof field === 'object' && field !== null) {
-          types.add(field.type || 'unknown');
+        if (typeof field === 'object' && field !== null && 'type' in field) {
+          types.add((field as any).type);
         }
       });
     }
-    
     return Array.from(types);
   }
 
   private assessComplexity(chartSpecs: ChartSpec[]): 'simple' | 'moderate' | 'complex' {
-    if (chartSpecs.length === 0) return 'simple';
-    if (chartSpecs.length <= 2) return 'simple';
-    if (chartSpecs.length <= 4) return 'moderate';
+    if (chartSpecs.length <= 1) return 'simple';
+    if (chartSpecs.length <= 3) return 'moderate';
     return 'complex';
   }
 }

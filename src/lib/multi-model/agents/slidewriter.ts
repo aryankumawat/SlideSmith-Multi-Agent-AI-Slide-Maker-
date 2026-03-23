@@ -269,9 +269,18 @@ Return as JSON:
       return [];
     }
 
-    // Validate that cited snippet IDs exist
-    const validSnippetIds = snippets.map(s => s.id);
-    return slideData.citations.filter((id: string) => validSnippetIds.includes(id));
+    // Build a Set for O(1) lookups
+    const validSnippetIds = new Set(snippets.map(s => s.id));
+
+    // Only keep citations that resolve to real snippets with sufficient confidence
+    const validCitations = slideData.citations.filter((id: string) => {
+      if (!validSnippetIds.has(id)) return false;
+      const snippet = snippets.find(s => s.id === id);
+      return snippet && snippet.confidence >= 0.6;
+    });
+
+    // Deduplicate
+    return [...new Set(validCitations)];
   }
 
   private estimateSlideDuration(slideData: { bullets?: string[]; subtitle?: string }): number {

@@ -1,27 +1,19 @@
 import { ModelRouter, TaskContext } from './router';
 import { BaseAgent } from './base-agent';
-import { 
-  Deck, 
-  DeckOutline, 
-  ResearchSnippet, 
-  Slide, 
+import {
+  Deck,
+  DeckOutline,
+  ResearchSnippet,
+  Slide,
   ExecutiveSummary,
   AudienceAdaptation,
   QualityCheck,
-  DataVizInput,
   DataVizOutput,
-  MediaFinderInput,
   MediaFinderOutput,
-  SpeakerNotesInput,
   SpeakerNotesOutput,
-  AccessibilityInput,
   AccessibilityOutput,
-  LiveWidgetInput,
-  LiveWidgetOutput,
-  ExecutiveSummaryInput,
   ExecutiveSummaryOutput,
-  AudienceAdapterInput,
-  AudienceAdapterOutput
+  AudienceAdapterOutput,
 } from './schemas';
 
 // ============================================================================
@@ -38,6 +30,12 @@ export interface OrchestratorInput {
   sources?: string[];
   urls?: string[];
   enableLive?: boolean;
+  /** Trigger executive summary regardless of audience type */
+  generateExecutiveSummary?: boolean;
+  /** Re-tune the assembled deck for a secondary audience */
+  targetAudience?: string;
+  targetTone?: string;
+  targetDuration?: number;
   policy?: 'quality' | 'speed' | 'cost' | 'balanced' | 'local-only';
 }
 
@@ -54,8 +52,12 @@ export interface OrchestratorOutput {
       consistency: number;
     };
   };
-  executiveSummary?: ExecutiveSummary;
+  executiveSummary?: ExecutiveSummaryOutput;
+  audienceAdaptation?: AudienceAdapterOutput;
   qualityChecks?: QualityCheck[];
+  speakerNotes?: SpeakerNotesOutput;
+  mediaEnhancements?: Record<string, MediaFinderOutput>;
+  dataVizEnhancements?: Record<string, DataVizOutput>;
 }
 
 export class MultiModelOrchestrator {
@@ -75,17 +77,15 @@ export class MultiModelOrchestrator {
   // ============================================================================
 
   async generatePresentation(input: OrchestratorInput): Promise<OrchestratorOutput> {
-    // Ensure agents are initialized before proceeding
     if (!this.isInitialized) {
       await this.initializationPromise;
     }
 
     const startTime = Date.now();
-    const taskId = `task-${Date.now()}`;
-    
+
     try {
       console.log(`[Orchestrator] Starting presentation generation for: ${input.topic}`);
-      
+
       // Step 1: Research (Evidence Collection)
       console.log('[Orchestrator] Step 1: Research');
       const researchResult = await this.executeAgent('researcher', {
@@ -96,7 +96,7 @@ export class MultiModelOrchestrator {
         urls: input.urls,
         maxSnippets: 20,
         minConfidence: 0.6,
-      }, input.policy);
+      }, input.policy) as any;
 
       // Step 2: Structure (Deck Outline Planning)
       console.log('[Orchestrator] Step 2: Structure');
@@ -108,85 +108,171 @@ export class MultiModelOrchestrator {
         researchSnippets: researchResult.snippets,
         theme: input.theme,
         duration: input.duration,
-      }, input.policy);
+      }, input.policy) as any;
 
-      // Step 3: Content Generation (Parallel per section)
-      console.log('[Orchestrator] Step 3: Content Generation');
-      const slides = await this.generateSlidesInParallel(
-        structureResult.outline,
+      // Step 3: Content Generation + per-section Media/DataViz (parallel)
+      console.log('[Orchestrator] Step 3: Content Generation + Media/DataViz');
+      const { slides, mediaEnhancements, dataVizEnhancements } =
+        await this.generateSlidesWithEnhancements(
+          structureResult.outline,
+          researchResult.snippets,
+          input
+        );
+
+      // Step 4: Quality Assurance Pipeline (parallel)
+      console.log('[Orchestrator] Step 4: Quality Assurance');
+      const qualityResults = await this.runQualityPipeline(
+        slides,
         researchResult.snippets,
         input
       );
 
-      // Step 4: Quality Assurance Pipeline
-      console.log('[Orchestrator] Step 4: Quality Assurance');
-      const qualityResults = await this.runQualityPipeline(slides, researchResult.snippets, input);
+      // Step 5: Speaker Notes (parallel with QA but after slides are ready)
+      console.log('[Orchestrator] Step 5: Speaker Notes');
+      const speakerNotes = await this.generateSpeakerNotes(
+        slides,
+        input,
+        structureResult.outline.estimatedDuration
+      );
 
-      // Step 5: Final Assembly
-      console.log('[Orchestrator] Step 5: Final Assembly');
-      const deck = this.assembleDeck(structureResult.outline, slides, researchResult.snippets, input);
-
-      // Step 6: Executive Summary (Optional)
-      let executiveSummary: ExecutiveSummary | undefined;
-      if (input.audience.toLowerCase().includes('executive')) {
-        console.log('[Orchestrator] Step 6: Executive Summary');
-        executiveSummary = await this.generateExecutiveSummary(deck);
+      // Enrich slide notes with speaker notes output
+      if (speakerNotes) {
+        this.enrichSlidesWithNotes(slides, speakerNotes);
       }
 
-      // Calculate metadata
+      // Step 6: Final Assembly
+      console.log('[Orchestrator] Step 6: Final Assembly');
+      const deck = this.assembleDeck(
+        structureResult.outline,
+        slides,
+        researchResult.snippets,
+        input,
+        qualityResults.scores
+      );
+
+      // Step 7: Executive Summary (always available, gated by flag or exec audience)
+      let executiveSummary: ExecutiveSummaryOutput | undefined;
+      const wantsExecSummary =
+        input.generateExecutiveSummary ||
+        input.audience.toLowerCase().includes('executive');
+      if (wantsExecSummary) {
+        console.log('[Orchestrator] Step 7: Executive Summary');
+        executiveSummary = await this.generateExecutiveSummary(deck, input);
+      }
+
+      // Step 8: Audience Adaptation (optional, if targetAudience specified)
+      let audienceAdaptation: AudienceAdapterOutput | undefined;
+      if (input.targetAudience && input.targetAudience !== input.audience) {
+        console.log('[Orchestrator] Step 8: Audience Adaptation');
+        audienceAdaptation = await this.adaptForAudienceInPipeline(deck, input);
+      }
+
       const processingTime = Date.now() - startTime;
-      const metadata = this.calculateMetadata(processingTime);
+      const metadata = this.calculateMetadata(processingTime, qualityResults.scores);
 
       const output: OrchestratorOutput = {
         deck,
         metadata,
         executiveSummary,
+        audienceAdaptation,
         qualityChecks: qualityResults.checks,
+        speakerNotes: speakerNotes || undefined,
+        mediaEnhancements,
+        dataVizEnhancements,
       };
 
-      console.log(`[Orchestrator] Presentation generation completed in ${processingTime}ms`);
+      console.log(`[Orchestrator] Completed in ${processingTime}ms`);
       return output;
 
     } catch (error) {
       console.error('[Orchestrator] Generation failed:', error);
-      throw new Error(`Presentation generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Presentation generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
   // ============================================================================
-  // PARALLEL SLIDE GENERATION
+  // PARALLEL SLIDE GENERATION + PER-SECTION MEDIA & DATA VIZ
   // ============================================================================
 
-  private async generateSlidesInParallel(
+  private async generateSlidesWithEnhancements(
     outline: DeckOutline,
     snippets: ResearchSnippet[],
     input: OrchestratorInput
-  ): Promise<Slide[]> {
-    const slidePromises = outline.sections.map(async (section, sectionIndex) => {
-      const slidewriterInput = {
-        section,
-        researchSnippets: snippets,
-        context: {
-          topic: input.topic,
-          audience: input.audience,
-          tone: input.tone,
-          theme: input.theme || 'professional',
-          slideIndex: sectionIndex + 1,
-          totalSlides: outline.sections.length,
-        },
-        wordBudgets: {
-          titleMax: 8,
-          bulletMax: 12,
-          bulletsPerSlide: 6,
-        },
-      };
+  ): Promise<{
+    slides: Slide[];
+    mediaEnhancements: Record<string, MediaFinderOutput>;
+    dataVizEnhancements: Record<string, DataVizOutput>;
+  }> {
+    const sectionResults = await Promise.all(
+      outline.sections.map(async (section, sectionIndex) => {
+        // 1. Generate slides for this section
+        const slidewriterInput = {
+          section,
+          researchSnippets: snippets,
+          context: {
+            topic: input.topic,
+            audience: input.audience,
+            tone: input.tone,
+            theme: input.theme || 'professional',
+            slideIndex: sectionIndex + 1,
+            totalSlides: outline.sections.length,
+          },
+          wordBudgets: {
+            titleMax: 8,
+            bulletMax: 12,
+            bulletsPerSlide: 6,
+          },
+        };
+        const slideResult = await this.executeAgent('slidewriter', slidewriterInput, input.policy) as any;
+        const slides: Slide[] = slideResult.slides || [];
 
-      const result = await this.executeAgent('slidewriter', slidewriterInput, input.policy);
-      return result.slides;
+        // 2. In parallel: Media Finder + Data Viz Planner for this section
+        const [mediaResult, dataVizResult] = await Promise.all([
+          this.executeAgent('media-finder', {
+            sectionContext: `${section.title}: ${section.goal}`,
+            keywords: section.keyPoints.slice(0, 5),
+            themeStyle: input.theme || 'professional',
+            contentType: 'presentation slide',
+          }, input.policy).catch(err => {
+            console.warn(`[Orchestrator] Media finder failed for section "${section.title}":`, err);
+            return null;
+          }),
+
+          section.chartSuggested
+            ? this.executeAgent('data-viz-planner', {
+                analyticalQuestion: section.goal,
+                dataSchema: {},
+                sampleData: [],
+                slideContext: `${section.title} — ${section.goal}`,
+              }, input.policy).catch(err => {
+                console.warn(`[Orchestrator] Data viz planner failed for section "${section.title}":`, err);
+                return null;
+              })
+            : Promise.resolve(null),
+        ]);
+
+        return {
+          sectionId: section.id,
+          slides,
+          mediaResult: mediaResult as MediaFinderOutput | null,
+          dataVizResult: dataVizResult as DataVizOutput | null,
+        };
+      })
+    );
+
+    const allSlides = sectionResults.flatMap(r => r.slides);
+
+    const mediaEnhancements: Record<string, MediaFinderOutput> = {};
+    const dataVizEnhancements: Record<string, DataVizOutput> = {};
+
+    sectionResults.forEach(r => {
+      if (r.mediaResult) mediaEnhancements[r.sectionId] = r.mediaResult;
+      if (r.dataVizResult) dataVizEnhancements[r.sectionId] = r.dataVizResult;
     });
 
-    const slideArrays = await Promise.all(slidePromises);
-    return slideArrays.flat();
+    return { slides: allSlides, mediaEnhancements, dataVizEnhancements };
   }
 
   // ============================================================================
@@ -197,103 +283,170 @@ export class MultiModelOrchestrator {
     slides: Slide[],
     snippets: ResearchSnippet[],
     input: OrchestratorInput
-  ): Promise<{ checks: QualityCheck[]; scores: any }> {
+  ): Promise<{ checks: QualityCheck[]; scores: Record<string, number> }> {
     const checks: QualityCheck[] = [];
-    const scores: any = {};
+    const scores: Record<string, number> = {};
 
-    // Run quality checks in parallel for better performance
     const qualityPromises = [
-      // Copy Tightening (needs to run first as it modifies slides)
+      // Copy Tightening (modifies slide content)
       this.executeAgent('copy-tightener', {
         slides,
         audience: input.audience,
         tone: input.tone,
-      }, input.policy).then(result => {
-        // Update slides with tightened content
-        Object.assign(slides, result.slides);
-        return { type: 'copy', result, score: result.qualityScore || 0.8 };
-      }).catch(error => {
-        console.warn('[Orchestrator] Copy tightening failed:', error);
-        return { type: 'copy', result: null, score: 0.5 };
+      }, input.policy).then((result: any) => {
+        if (result?.slides) Object.assign(slides, result.slides);
+        return { type: 'consistency', score: result?.qualityScore ?? 0.75 };
+      }).catch(err => {
+        console.warn('[Orchestrator] Copy tightening failed:', err);
+        return { type: 'consistency', score: 0.5 };
       }),
 
-      // Fact Checking (can run in parallel)
+      // Fact Checking
       this.executeAgent('fact-checker', {
         slides,
         researchSnippets: snippets,
-      }, input.policy).then(result => {
-        return { type: 'fact', result, score: result.overallScore || 0.8 };
-      }).catch(error => {
-        console.warn('[Orchestrator] Fact checking failed:', error);
-        return { type: 'fact', result: null, score: 0.5 };
+      }, input.policy).then((result: any) => {
+        if (result?.checks) checks.push(...result.checks);
+        return { type: 'factCheck', score: result?.overallScore ?? 0.75 };
+      }).catch(err => {
+        console.warn('[Orchestrator] Fact checking failed:', err);
+        return { type: 'factCheck', score: 0.5 };
       }),
 
-      // Accessibility & Design Linting (can run in parallel)
+      // Accessibility Linting
       this.executeAgent('accessibility-linter', {
-        slides,
+        deck: { slides, title: input.topic },
         theme: input.theme || 'professional',
-      }, input.policy).then(result => {
-        return { type: 'accessibility', result, score: result.overallScore || 0.8 };
-      }).catch(error => {
-        console.warn('[Orchestrator] Accessibility checking failed:', error);
-        return { type: 'accessibility', result: null, score: 0.5 };
+        themeTokens: {
+          colors: { primary: '#1a1a2e', background: '#ffffff', text: '#000000' },
+          typography: { bodySize: '14px', headingSize: '24px' },
+          spacing: { slide: '40px' },
+        },
+      }, input.policy).then((result: any) => {
+        return { type: 'accessibility', score: result ? this.accessibilityScore(result) : 0.75 };
+      }).catch(err => {
+        console.warn('[Orchestrator] Accessibility checking failed:', err);
+        return { type: 'accessibility', score: 0.5 };
       }),
 
-      // Readability Analysis (can run in parallel)
+      // Readability Analysis
       this.executeAgent('readability-analyzer', {
         slides,
         audience: input.audience,
-      }, input.policy).then(result => {
-        return { type: 'readability', result, score: result.overallScore || 0.8 };
-      }).catch(error => {
-        console.warn('[Orchestrator] Readability analysis failed:', error);
-        return { type: 'readability', result: null, score: 0.5 };
-      })
+      }, input.policy).then((result: any) => {
+        return { type: 'readability', score: result?.overallScore ?? 0.75 };
+      }).catch(err => {
+        console.warn('[Orchestrator] Readability analysis failed:', err);
+        return { type: 'readability', score: 0.5 };
+      }),
     ];
 
-    // Wait for all quality checks to complete
     const results = await Promise.all(qualityPromises);
-
-    // Process results
-    results.forEach(({ type, result, score }) => {
-      scores[type] = score;
-      
-      if (result && result.checks) {
-        checks.push(...result.checks);
-      }
-    });
+    results.forEach(({ type, score }) => { scores[type] = score; });
 
     return { checks, scores };
+  }
+
+  /** Derive a 0-1 accessibility score from the linter output */
+  private accessibilityScore(result: AccessibilityOutput): number {
+    const total = result.metadata.totalIssues;
+    if (total === 0) return 1.0;
+    const criticalWeight = result.metadata.criticalIssues * 0.3;
+    const warningWeight = result.metadata.warningIssues * 0.1;
+    const penalty = Math.min(criticalWeight + warningWeight, 1.0);
+    return Math.max(0, 1.0 - penalty);
+  }
+
+  // ============================================================================
+  // SPEAKER NOTES GENERATION
+  // ============================================================================
+
+  private async generateSpeakerNotes(
+    slides: Slide[],
+    input: OrchestratorInput,
+    estimatedDuration?: number
+  ): Promise<SpeakerNotesOutput | null> {
+    try {
+      const result = await this.executeAgent('speaker-notes-generator', {
+        slides,
+        audience: input.audience,
+        tone: input.tone,
+        estimatedDuration: estimatedDuration || input.duration || 15,
+        purpose: `Presentation on "${input.topic}" for ${input.audience}`,
+      }, input.policy) as SpeakerNotesOutput;
+      return result;
+    } catch (err) {
+      console.warn('[Orchestrator] Speaker notes generation failed:', err);
+      return null;
+    }
+  }
+
+  /** Overwrite each slide's .notes with the richer speaker note content */
+  private enrichSlidesWithNotes(slides: Slide[], speakerNotes: SpeakerNotesOutput): void {
+    const noteMap = new Map(speakerNotes.notes.map(n => [n.slideId, n]));
+    slides.forEach(slide => {
+      const note = noteMap.get(slide.id);
+      if (note) {
+        slide.notes = [
+          note.notes,
+          note.keyPoints.length ? `Key points: ${note.keyPoints.join(' | ')}` : '',
+          note.transitions.length ? `Transition: ${note.transitions[0]}` : '',
+          `Timing: ${note.timing} (~${note.duration})`,
+        ].filter(Boolean).join('\n\n');
+      }
+    });
   }
 
   // ============================================================================
   // EXECUTIVE SUMMARY GENERATION
   // ============================================================================
 
-  private async generateExecutiveSummary(deck: Deck): Promise<ExecutiveSummary> {
-    const summaryResult = await this.executeAgent('executive-summary', {
+  private async generateExecutiveSummary(
+    deck: Deck,
+    input: OrchestratorInput
+  ): Promise<ExecutiveSummaryOutput> {
+    return await this.executeAgent('executive-summary', {
       deck,
-    }, 'quality');
-
-    return summaryResult;
+      audience: input.audience,
+      tone: input.tone,
+    }, 'quality') as ExecutiveSummaryOutput;
   }
 
   // ============================================================================
-  // AUDIENCE ADAPTATION
+  // AUDIENCE ADAPTATION (in-pipeline)
   // ============================================================================
 
+  private async adaptForAudienceInPipeline(
+    deck: Deck,
+    input: OrchestratorInput
+  ): Promise<AudienceAdapterOutput> {
+    return await this.executeAgent('audience-adapter', {
+      deck,
+      originalAudience: input.audience,
+      targetAudience: input.targetAudience!,
+      originalTone: input.tone,
+      targetTone: input.targetTone || input.tone,
+      originalDuration: input.duration || 15,
+      targetDuration: input.targetDuration || input.duration || 15,
+    }, 'balanced') as AudienceAdapterOutput;
+  }
+
+  /** Public convenience method (unchanged API) */
   async adaptForAudience(
     deck: Deck,
     targetAudience: string,
     targetDuration?: number
   ): Promise<AudienceAdaptation> {
-    const adaptationResult = await this.executeAgent('audience-adapter', {
+    const result = await this.executeAgent('audience-adapter', {
       deck,
+      originalAudience: deck.meta.audience,
       targetAudience,
-      targetDuration,
-    }, 'balanced');
-
-    return adaptationResult;
+      originalTone: deck.meta.tone,
+      targetTone: deck.meta.tone,
+      originalDuration: deck.meta.duration || 15,
+      targetDuration: targetDuration || deck.meta.duration || 15,
+    }, 'balanced') as any;
+    return result;
   }
 
   // ============================================================================
@@ -307,22 +460,20 @@ export class MultiModelOrchestrator {
     };
 
     console.log(`[Orchestrator] Executing agent: ${agentType}`);
-    console.log(`[Orchestrator] Available agents:`, Array.from(this.agents.keys()));
 
     const agent = this.agents.get(agentType);
     if (!agent) {
-      throw new Error(`Agent not found: ${agentType}. Available agents: ${Array.from(this.agents.keys()).join(', ')}`);
+      throw new Error(
+        `Agent not found: ${agentType}. Available: ${Array.from(this.agents.keys()).join(', ')}`
+      );
     }
 
-    // Select model for this agent
     const model = this.router.selectModel(agentType, context, policy);
     if (!model) {
       throw new Error(`No available model for agent: ${agentType}`);
     }
 
     agent.setModel(model);
-
-    // Execute the agent
     return await agent.execute(input, context);
   }
 
@@ -334,61 +485,36 @@ export class MultiModelOrchestrator {
     outline: DeckOutline,
     slides: Slide[],
     snippets: ResearchSnippet[],
-    input: OrchestratorInput
+    input: OrchestratorInput,
+    qualityScores: Record<string, number>
   ): Deck {
-    // Add title slide
     const titleSlide: Slide = {
       id: 'title-slide',
       layout: 'title',
       blocks: [
-        {
-          type: 'Heading',
-          text: outline.title,
-          level: 1,
-          animation: 'fadeIn',
-        },
-        {
-          type: 'Subheading',
-          text: outline.subtitle || '',
-          animation: 'slideInFromBottom',
-        },
+        { type: 'Heading', text: outline.title, level: 1, animation: 'fadeIn' },
+        { type: 'Subheading', text: outline.subtitle || '', animation: 'slideInFromBottom' },
       ],
-      notes: `Welcome to our presentation on ${outline.title}. Today we'll explore ${outline.sections.length} key areas.`,
+      notes: `Welcome to "${outline.title}". Today we'll cover ${outline.sections.length} key areas.`,
       order: 0,
     };
 
-    // Add agenda slide
     const agendaSlide: Slide = {
       id: 'agenda-slide',
       layout: 'title+bullets',
       blocks: [
-        {
-          type: 'Heading',
-          text: 'Agenda',
-          level: 1,
-          animation: 'slideInFromTop',
-        },
-        {
-          type: 'Bullets',
-          items: outline.sections.map(s => s.title),
-          animation: 'staggerIn',
-        },
+        { type: 'Heading', text: 'Agenda', level: 1, animation: 'slideInFromTop' },
+        { type: 'Bullets', items: outline.sections.map(s => s.title), animation: 'staggerIn' },
       ],
-      notes: 'Here\'s what we\'ll cover today. Each section builds on the previous one.',
+      notes: "Here's what we'll cover today. Each section builds on the previous one.",
       order: 1,
     };
 
-    // Add conclusion slide
     const conclusionSlide: Slide = {
       id: 'conclusion-slide',
       layout: 'title+bullets',
       blocks: [
-        {
-          type: 'Heading',
-          text: 'Conclusion',
-          level: 1,
-          animation: 'fadeIn',
-        },
+        { type: 'Heading', text: 'Conclusion', level: 1, animation: 'fadeIn' },
         {
           type: 'Bullets',
           items: [
@@ -403,42 +529,24 @@ export class MultiModelOrchestrator {
       order: slides.length + 2,
     };
 
-    // Add references slide if we have sources
-    let referencesSlide: Slide | undefined;
+    const allSlides = [titleSlide, agendaSlide, ...slides, conclusionSlide];
+
     if (outline.references.length > 0) {
-      referencesSlide = {
+      allSlides.push({
         id: 'references-slide',
         layout: 'title+bullets',
         blocks: [
-          {
-            type: 'Heading',
-            text: 'References',
-            level: 1,
-            animation: 'fadeIn',
-          },
-          {
-            type: 'Bullets',
-            items: outline.references,
-            animation: 'staggerIn',
-          },
+          { type: 'Heading', text: 'References', level: 1, animation: 'fadeIn' },
+          { type: 'Bullets', items: outline.references, animation: 'staggerIn' },
         ],
         notes: 'Sources and references used in this presentation.',
         order: slides.length + 3,
-      };
+      });
     }
 
-    // Assemble all slides
-    const allSlides = [titleSlide, agendaSlide, ...slides, conclusionSlide];
-    if (referencesSlide) {
-      allSlides.push(referencesSlide);
-    }
+    allSlides.forEach((slide, index) => { slide.order = index; });
 
-    // Update slide orders
-    allSlides.forEach((slide, index) => {
-      slide.order = index;
-    });
-
-    const deck: Deck = {
+    return {
       id: `deck-${Date.now()}`,
       meta: {
         title: outline.title,
@@ -454,31 +562,31 @@ export class MultiModelOrchestrator {
       slides: allSlides,
       researchSnippets: snippets,
       quality: {
-        factCheckScore: 0.8,
-        accessibilityScore: 0.8,
-        readabilityScore: 0.8,
-        consistencyScore: 0.8,
+        factCheckScore: qualityScores.factCheck ?? 0.75,
+        accessibilityScore: qualityScores.accessibility ?? 0.75,
+        readabilityScore: qualityScores.readability ?? 0.75,
+        consistencyScore: qualityScores.consistency ?? 0.75,
       },
     };
-
-    return deck;
   }
 
   // ============================================================================
   // METADATA CALCULATION
   // ============================================================================
 
-  private calculateMetadata(processingTime: number): OrchestratorOutput['metadata'] {
-    // This would be calculated from actual token usage in a real implementation
+  private calculateMetadata(
+    processingTime: number,
+    qualityScores: Record<string, number>
+  ): OrchestratorOutput['metadata'] {
     return {
-      totalTokens: 0, // Would be calculated from agent executions
-      totalCost: 0, // Would be calculated from token usage and model costs
+      totalTokens: 0,
+      totalCost: 0,
       processingTime,
       qualityScores: {
-        factCheck: 0.8,
-        accessibility: 0.8,
-        readability: 0.8,
-        consistency: 0.8,
+        factCheck: qualityScores.factCheck ?? 0.75,
+        accessibility: qualityScores.accessibility ?? 0.75,
+        readability: qualityScores.readability ?? 0.75,
+        consistency: qualityScores.consistency ?? 0.75,
       },
     };
   }
@@ -489,77 +597,60 @@ export class MultiModelOrchestrator {
 
   private async initializeAgents(): Promise<void> {
     console.log('[Orchestrator] Initializing agents...');
-    
-    // Import and initialize all agents
+
     try {
-      // Core agents
-      const { ResearcherAgent } = await import('./agents/researcher');
-      const researcher = new ResearcherAgent();
-      researcher.setRouter(this.router);
-      this.agents.set('researcher', researcher);
+      const [
+        { ResearcherAgent },
+        { StructurerAgent },
+        { SlidewriterAgent },
+        { CopyTightenerAgent },
+        { FactCheckerAgent },
+        { DataVizPlannerAgent },
+        { MediaFinderAgent },
+        { SpeakerNotesGeneratorAgent },
+        { AccessibilityLinterAgent },
+        { LiveWidgetPlannerAgent },
+        { ExecutiveSummaryAgent },
+        { AudienceAdapterAgent },
+        { ReadabilityAnalyzerAgent },
+      ] = await Promise.all([
+        import('./agents/researcher'),
+        import('./agents/structurer'),
+        import('./agents/slidewriter'),
+        import('./agents/copy-tightener'),
+        import('./agents/fact-checker'),
+        import('./agents/data-viz-planner'),
+        import('./agents/media-finder'),
+        import('./agents/speaker-notes-generator'),
+        import('./agents/accessibility-linter'),
+        import('./agents/live-widget-planner'),
+        import('./agents/executive-summary'),
+        import('./agents/audience-adapter'),
+        import('./agents/readability-analyzer'),
+      ]);
 
-      const { StructurerAgent } = await import('./agents/structurer');
-      const structurer = new StructurerAgent();
-      structurer.setRouter(this.router);
-      this.agents.set('structurer', structurer);
+      const agentPairs: [string, BaseAgent][] = [
+        ['researcher', new ResearcherAgent()],
+        ['structurer', new StructurerAgent()],
+        ['slidewriter', new SlidewriterAgent()],
+        ['copy-tightener', new CopyTightenerAgent()],
+        ['fact-checker', new FactCheckerAgent()],
+        ['data-viz-planner', new DataVizPlannerAgent()],
+        ['media-finder', new MediaFinderAgent()],
+        ['speaker-notes-generator', new SpeakerNotesGeneratorAgent()],
+        ['accessibility-linter', new AccessibilityLinterAgent()],
+        ['live-widget-planner', new LiveWidgetPlannerAgent()],
+        ['executive-summary', new ExecutiveSummaryAgent()],
+        ['audience-adapter', new AudienceAdapterAgent()],
+        ['readability-analyzer', new ReadabilityAnalyzerAgent()],
+      ];
 
-      const { SlidewriterAgent } = await import('./agents/slidewriter');
-      const slidewriter = new SlidewriterAgent();
-      slidewriter.setRouter(this.router);
-      this.agents.set('slidewriter', slidewriter);
+      for (const [name, agent] of agentPairs) {
+        agent.setRouter(this.router);
+        this.agents.set(name, agent);
+      }
 
-      const { CopyTightenerAgent } = await import('./agents/copy-tightener');
-      const copyTightener = new CopyTightenerAgent();
-      copyTightener.setRouter(this.router);
-      this.agents.set('copy-tightener', copyTightener);
-
-      const { FactCheckerAgent } = await import('./agents/fact-checker');
-      const factChecker = new FactCheckerAgent();
-      factChecker.setRouter(this.router);
-      this.agents.set('fact-checker', factChecker);
-
-      // New specialized agents
-      const { DataVizPlannerAgent } = await import('./agents/data-viz-planner');
-      const dataVizPlanner = new DataVizPlannerAgent();
-      dataVizPlanner.setRouter(this.router);
-      this.agents.set('data-viz-planner', dataVizPlanner);
-
-      const { MediaFinderAgent } = await import('./agents/media-finder');
-      const mediaFinder = new MediaFinderAgent();
-      mediaFinder.setRouter(this.router);
-      this.agents.set('media-finder', mediaFinder);
-
-      const { SpeakerNotesGeneratorAgent } = await import('./agents/speaker-notes-generator');
-      const speakerNotesGenerator = new SpeakerNotesGeneratorAgent();
-      speakerNotesGenerator.setRouter(this.router);
-      this.agents.set('speaker-notes-generator', speakerNotesGenerator);
-
-      const { AccessibilityLinterAgent } = await import('./agents/accessibility-linter');
-      const accessibilityLinter = new AccessibilityLinterAgent();
-      accessibilityLinter.setRouter(this.router);
-      this.agents.set('accessibility-linter', accessibilityLinter);
-
-      const { LiveWidgetPlannerAgent } = await import('./agents/live-widget-planner');
-      const liveWidgetPlanner = new LiveWidgetPlannerAgent();
-      liveWidgetPlanner.setRouter(this.router);
-      this.agents.set('live-widget-planner', liveWidgetPlanner);
-
-      const { ExecutiveSummaryAgent } = await import('./agents/executive-summary');
-      const executiveSummary = new ExecutiveSummaryAgent();
-      executiveSummary.setRouter(this.router);
-      this.agents.set('executive-summary', executiveSummary);
-
-          const { AudienceAdapterAgent } = await import('./agents/audience-adapter');
-          const audienceAdapter = new AudienceAdapterAgent();
-          audienceAdapter.setRouter(this.router);
-          this.agents.set('audience-adapter', audienceAdapter);
-
-          const { ReadabilityAnalyzerAgent } = await import('./agents/readability-analyzer');
-          const readabilityAnalyzer = new ReadabilityAnalyzerAgent();
-          readabilityAnalyzer.setRouter(this.router);
-          this.agents.set('readability-analyzer', readabilityAnalyzer);
-
-          console.log(`[Orchestrator] Initialized ${this.agents.size} agents`);
+      console.log(`[Orchestrator] Initialized ${this.agents.size} agents`);
       this.isInitialized = true;
     } catch (error) {
       console.error('[Orchestrator] Failed to initialize agents:', error);

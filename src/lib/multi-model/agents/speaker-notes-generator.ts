@@ -1,37 +1,35 @@
-import { BaseAgent } from '../base-agent';
+import { BaseAgent, AgentConfig } from '../base-agent';
 import { SpeakerNotesInput, SpeakerNotesOutput, SpeakerNote } from '../schemas';
 
-export interface SpeakerNotesConfig {
-  name: string;
-  description: string;
-  model: {
-    provider: 'ollama' | 'openai' | 'demo';
-    apiKey: string;
-    baseUrl: string;
-    model: string;
-    maxTokens: number;
-    temperature: number;
-  };
-}
+// ============================================================================
+// SPEAKER NOTES GENERATOR AGENT
+// ============================================================================
 
 export class SpeakerNotesGeneratorAgent extends BaseAgent {
-  constructor(config: SpeakerNotesConfig) {
+  constructor() {
+    const config: AgentConfig = {
+      name: 'speaker-notes-generator',
+      description: 'Generates speaker notes with timing cues and audience engagement guidance for each slide',
+      capabilities: ['note-composition', 'timing-guidance', 'audience-engagement'],
+      maxRetries: 3,
+      timeout: 45000,
+    };
     super(config);
   }
 
-  async execute(input: SpeakerNotesInput): Promise<SpeakerNotesOutput> {
+  async execute(input: SpeakerNotesInput, context?: unknown): Promise<SpeakerNotesOutput> {
     try {
-      console.log(`[${this.config.name}] Generating speaker notes...`);
-      
+      console.log(`[${this.config.name}] Generating speaker notes for ${input.slides.length} slides...`);
+
       const speakerNotes = await this.generateSpeakerNotes(input);
-      
+
       const output: SpeakerNotesOutput = {
         notes: speakerNotes,
         metadata: {
           totalSlides: speakerNotes.length,
           averageDuration: this.calculateAverageDuration(speakerNotes),
-          totalDuration: this.calculateTotalDuration(speakerNotes)
-        }
+          totalDuration: this.calculateTotalDuration(speakerNotes),
+        },
       };
 
       console.log(`[${this.config.name}] Generated notes for ${speakerNotes.length} slides`);
@@ -42,98 +40,92 @@ export class SpeakerNotesGeneratorAgent extends BaseAgent {
   }
 
   private async generateSpeakerNotes(input: SpeakerNotesInput): Promise<SpeakerNote[]> {
-    const notes: SpeakerNote[] = [];
-    
-    for (const slide of input.slides) {
+    // Generate all slide notes in parallel for speed
+    const notePromises = input.slides.map(async (slide) => {
       const prompt = this.buildSpeakerNotesPrompt(input, slide);
       const response = await this.callLLM(prompt);
-      const note = this.parseSpeakerNote(response, slide.id);
-      notes.push(note);
-    }
-    
-    return notes;
+      return this.parseSpeakerNote(response.content, slide.id);
+    });
+
+    return Promise.all(notePromises);
   }
 
   private buildSpeakerNotesPrompt(input: SpeakerNotesInput, slide: any): string {
-    return `
-You are a presentation coach. Generate speaker notes for this slide.
+    const titleBlock = slide.blocks?.find((b: any) => b.type === 'Heading');
+    const bulletsBlock = slide.blocks?.find((b: any) => b.type === 'Bullets');
+    const title = titleBlock?.text || slide.id;
+    const bullets = bulletsBlock?.items?.join('; ') || '';
 
-Slide Information:
-- ID: ${slide.id}
-- Title: ${slide.title || 'Untitled'}
-- Content: ${JSON.stringify(slide.blocks, null, 2)}
-- Slide Type: ${slide.type || 'content'}
+    return `Generate speaker notes for this presentation slide.
 
-Presentation Context:
+Slide: "${title}"
+Bullets: ${bullets}
+Existing notes: ${slide.notes || 'none'}
+
+Presentation context:
 - Audience: ${input.audience}
 - Tone: ${input.tone}
-- Duration: ${input.estimatedDuration} minutes
+- Total duration: ${input.estimatedDuration} minutes
 - Purpose: ${input.purpose}
 
-Guidelines:
-1. Provide 30-60 seconds of speaking guidance
-2. Complement, don't repeat the bullet points
-3. Add transitions and emphasis points
-4. Include timing cues
-5. Suggest when to pause or engage audience
-6. Mention key points to emphasize
-7. Add context or background information
-8. Include potential Q&A points
-
-Generate speaker notes that help the presenter deliver effectively.
-`;
+Return JSON only:
+{
+  "notes": "Full spoken script for this slide (2-4 sentences, do NOT repeat bullet text)",
+  "duration": "30-45 seconds",
+  "keyPoints": ["emphasis point 1", "emphasis point 2"],
+  "transitions": ["transition from previous", "lead-in to next"],
+  "audienceEngagement": ["pause for reaction", "ask question if relevant"],
+  "timing": "pace guidance (e.g. slow and deliberate)"
+}`;
   }
 
-  private parseSpeakerNote(response: string, slideId: string): SpeakerNote {
+  private parseSpeakerNote(content: string, slideId: string): SpeakerNote {
     try {
-      // Try to parse as JSON first
-      const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const parsed = JSON.parse(cleaned);
-      
+
       return {
         slideId,
-        notes: parsed.notes || response,
+        notes: parsed.notes || content,
         duration: parsed.duration || '30-45 seconds',
-        keyPoints: parsed.keyPoints || [],
-        transitions: parsed.transitions || [],
-        audienceEngagement: parsed.audienceEngagement || [],
-        timing: parsed.timing || 'Normal pace'
+        keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
+        transitions: Array.isArray(parsed.transitions) ? parsed.transitions : [],
+        audienceEngagement: Array.isArray(parsed.audienceEngagement) ? parsed.audienceEngagement : [],
+        timing: parsed.timing || 'Normal pace',
       };
-    } catch (error) {
-      // Fallback to plain text parsing
+    } catch {
       return {
         slideId,
-        notes: response,
+        notes: content,
         duration: '30-45 seconds',
-        keyPoints: this.extractKeyPoints(response),
+        keyPoints: this.extractKeyPoints(content),
         transitions: [],
         audienceEngagement: [],
-        timing: 'Normal pace'
+        timing: 'Normal pace',
       };
     }
   }
 
   private extractKeyPoints(text: string): string[] {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    return sentences.slice(0, 3).map(s => s.trim());
+    return text
+      .split(/[.!?]+/)
+      .filter(s => s.trim().length > 10)
+      .slice(0, 3)
+      .map(s => s.trim());
   }
 
   private calculateAverageDuration(notes: SpeakerNote[]): number {
     if (notes.length === 0) return 0;
-    
-    const totalSeconds = notes.reduce((sum, note) => {
-      const duration = note.duration;
-      const match = duration.match(/(\d+)/);
+    const total = notes.reduce((sum, note) => {
+      const match = note.duration.match(/(\d+)/);
       return sum + (match ? parseInt(match[1]) : 30);
     }, 0);
-    
-    return Math.round(totalSeconds / notes.length);
+    return Math.round(total / notes.length);
   }
 
   private calculateTotalDuration(notes: SpeakerNote[]): number {
     return notes.reduce((sum, note) => {
-      const duration = note.duration;
-      const match = duration.match(/(\d+)/);
+      const match = note.duration.match(/(\d+)/);
       return sum + (match ? parseInt(match[1]) : 30);
     }, 0);
   }
