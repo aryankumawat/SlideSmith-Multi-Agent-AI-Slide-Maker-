@@ -110,24 +110,42 @@ export class MultiModelOrchestrator {
         duration: input.duration,
       }, input.policy) as any;
 
-      // Step 3: Content Generation + per-section Media/DataViz (parallel)
-      console.log('[Orchestrator] Step 3: Content Generation + Media/DataViz');
-      const { slides, mediaEnhancements, dataVizEnhancements } =
-        await this.generateSlidesWithEnhancements(
-          structureResult.outline,
-          researchResult.snippets,
-          input
-        );
+      // Step 3: Streaming pipeline — Slidewriter + per-section QA + Media + DataViz
+      // Copy Tightener and Readability run per-section as slides are ready.
+      // FactChecker and Accessibility wait for the full deck (need cross-section context).
+      console.log('[Orchestrator] Step 3: Streaming slide generation + per-section QA');
+      const {
+        slides,
+        mediaEnhancements,
+        dataVizEnhancements,
+        perSectionScores,
+        qualityChecks: sectionQualityChecks,
+      } = await this.generateSlidesStreamingPipeline(
+        structureResult.outline,
+        researchResult.snippets,
+        input
+      );
 
-      // Step 4: Quality Assurance Pipeline (parallel)
-      console.log('[Orchestrator] Step 4: Quality Assurance');
-      const qualityResults = await this.runQualityPipeline(
+      // Step 4: Cross-deck QA (FactChecker + Accessibility — need full deck)
+      console.log('[Orchestrator] Step 4: Cross-deck quality assurance');
+      const crossDeckResults = await this.runCrossDeckQA(
         slides,
         researchResult.snippets,
         input
       );
 
-      // Step 5: Speaker Notes (parallel with QA but after slides are ready)
+      // Merge per-section + cross-deck scores
+      const qualityResults = {
+        checks: [...sectionQualityChecks, ...crossDeckResults.checks],
+        scores: {
+          consistency: perSectionScores.consistency,
+          readability: perSectionScores.readability,
+          factCheck: crossDeckResults.scores.factCheck,
+          accessibility: crossDeckResults.scores.accessibility,
+        },
+      };
+
+      // Step 5: Speaker Notes + Executive Summary run in parallel (both need full slide list)
       console.log('[Orchestrator] Step 5: Speaker Notes');
       const speakerNotes = await this.generateSpeakerNotes(
         slides,
@@ -135,7 +153,6 @@ export class MultiModelOrchestrator {
         structureResult.outline.estimatedDuration
       );
 
-      // Enrich slide notes with speaker notes output
       if (speakerNotes) {
         this.enrichSlidesWithNotes(slides, speakerNotes);
       }
@@ -193,10 +210,12 @@ export class MultiModelOrchestrator {
   }
 
   // ============================================================================
-  // PARALLEL SLIDE GENERATION + PER-SECTION MEDIA & DATA VIZ
+  // STREAMING PIPELINE — per-section Slidewriter + immediate per-section QA
+  // CopyTightener + Readability + Media + DataViz all start as each section
+  // finishes rather than waiting for all sections to complete.
   // ============================================================================
 
-  private async generateSlidesWithEnhancements(
+  private async generateSlidesStreamingPipeline(
     outline: DeckOutline,
     snippets: ResearchSnippet[],
     input: OrchestratorInput
@@ -204,10 +223,16 @@ export class MultiModelOrchestrator {
     slides: Slide[];
     mediaEnhancements: Record<string, MediaFinderOutput>;
     dataVizEnhancements: Record<string, DataVizOutput>;
+    perSectionScores: { consistency: number; readability: number };
+    qualityChecks: QualityCheck[];
   }> {
+    const allQualityChecks: QualityCheck[] = [];
+    const consistencyScores: number[] = [];
+    const readabilityScores: number[] = [];
+
     const sectionResults = await Promise.all(
       outline.sections.map(async (section, sectionIndex) => {
-        // 1. Generate slides for this section
+        // 1. Generate slides
         const slidewriterInput = {
           section,
           researchSnippets: snippets,
@@ -219,27 +244,47 @@ export class MultiModelOrchestrator {
             slideIndex: sectionIndex + 1,
             totalSlides: outline.sections.length,
           },
-          wordBudgets: {
-            titleMax: 8,
-            bulletMax: 12,
-            bulletsPerSlide: 6,
-          },
+          wordBudgets: { titleMax: 8, bulletMax: 12, bulletsPerSlide: 6 },
         };
         const slideResult = await this.executeAgent('slidewriter', slidewriterInput, input.policy) as any;
-        const slides: Slide[] = slideResult.slides || [];
+        const sectionSlides: Slide[] = slideResult.slides || [];
 
-        // 2. In parallel: Media Finder + Data Viz Planner for this section
-        const [mediaResult, dataVizResult] = await Promise.all([
+        // 2. Immediately start per-section work in parallel (streaming)
+        const [copyResult, readabilityResult, mediaResult, dataVizResult] = await Promise.all([
+          // Copy Tightener — runs per section as soon as slides are ready
+          this.executeAgent('copy-tightener', {
+            slides: sectionSlides,
+            audience: input.audience,
+            tone: input.tone,
+          }, input.policy).then((r: any) => {
+            if (r?.slides) sectionSlides.splice(0, sectionSlides.length, ...r.slides);
+            return { score: r?.qualityScore ?? 0.75 };
+          }).catch(err => {
+            console.warn(`[Orchestrator] Copy tightener failed for "${section.title}":`, err);
+            return { score: 0.5 };
+          }),
+
+          // Readability Analyzer — runs per section
+          this.executeAgent('readability-analyzer', {
+            slides: sectionSlides,
+            audience: input.audience,
+          }, input.policy).then((r: any) => ({ score: r?.overallScore ?? 0.75 })).catch(err => {
+            console.warn(`[Orchestrator] Readability failed for "${section.title}":`, err);
+            return { score: 0.5 };
+          }),
+
+          // Media Finder — runs per section
           this.executeAgent('media-finder', {
             sectionContext: `${section.title}: ${section.goal}`,
             keywords: section.keyPoints.slice(0, 5),
             themeStyle: input.theme || 'professional',
             contentType: 'presentation slide',
           }, input.policy).catch(err => {
-            console.warn(`[Orchestrator] Media finder failed for section "${section.title}":`, err);
+            console.warn(`[Orchestrator] Media finder failed for "${section.title}":`, err);
             return null;
           }),
 
+          // Data Viz Planner — only for sections with chartSuggested:true
           section.chartSuggested
             ? this.executeAgent('data-viz-planner', {
                 analyticalQuestion: section.goal,
@@ -247,15 +292,18 @@ export class MultiModelOrchestrator {
                 sampleData: [],
                 slideContext: `${section.title} — ${section.goal}`,
               }, input.policy).catch(err => {
-                console.warn(`[Orchestrator] Data viz planner failed for section "${section.title}":`, err);
+                console.warn(`[Orchestrator] Data viz failed for "${section.title}":`, err);
                 return null;
               })
             : Promise.resolve(null),
         ]);
 
+        consistencyScores.push(copyResult.score);
+        readabilityScores.push(readabilityResult.score);
+
         return {
           sectionId: section.id,
-          slides,
+          slides: sectionSlides,
           mediaResult: mediaResult as MediaFinderOutput | null,
           dataVizResult: dataVizResult as DataVizOutput | null,
         };
@@ -266,42 +314,37 @@ export class MultiModelOrchestrator {
 
     const mediaEnhancements: Record<string, MediaFinderOutput> = {};
     const dataVizEnhancements: Record<string, DataVizOutput> = {};
-
     sectionResults.forEach(r => {
       if (r.mediaResult) mediaEnhancements[r.sectionId] = r.mediaResult;
       if (r.dataVizResult) dataVizEnhancements[r.sectionId] = r.dataVizResult;
     });
 
-    return { slides: allSlides, mediaEnhancements, dataVizEnhancements };
+    const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0.75;
+
+    return {
+      slides: allSlides,
+      mediaEnhancements,
+      dataVizEnhancements,
+      perSectionScores: {
+        consistency: avg(consistencyScores),
+        readability: avg(readabilityScores),
+      },
+      qualityChecks: allQualityChecks,
+    };
   }
 
   // ============================================================================
-  // QUALITY ASSURANCE PIPELINE
+  // CROSS-DECK QA — FactChecker + Accessibility (need full deck context)
   // ============================================================================
 
-  private async runQualityPipeline(
+  private async runCrossDeckQA(
     slides: Slide[],
     snippets: ResearchSnippet[],
     input: OrchestratorInput
   ): Promise<{ checks: QualityCheck[]; scores: Record<string, number> }> {
     const checks: QualityCheck[] = [];
-    const scores: Record<string, number> = {};
 
-    const qualityPromises = [
-      // Copy Tightening (modifies slide content)
-      this.executeAgent('copy-tightener', {
-        slides,
-        audience: input.audience,
-        tone: input.tone,
-      }, input.policy).then((result: any) => {
-        if (result?.slides) Object.assign(slides, result.slides);
-        return { type: 'consistency', score: result?.qualityScore ?? 0.75 };
-      }).catch(err => {
-        console.warn('[Orchestrator] Copy tightening failed:', err);
-        return { type: 'consistency', score: 0.5 };
-      }),
-
-      // Fact Checking
+    const [factResult, accessibilityResult] = await Promise.all([
       this.executeAgent('fact-checker', {
         slides,
         researchSnippets: snippets,
@@ -313,7 +356,6 @@ export class MultiModelOrchestrator {
         return { type: 'factCheck', score: 0.5 };
       }),
 
-      // Accessibility Linting
       this.executeAgent('accessibility-linter', {
         deck: { slides, title: input.topic },
         theme: input.theme || 'professional',
@@ -322,29 +364,22 @@ export class MultiModelOrchestrator {
           typography: { bodySize: '14px', headingSize: '24px' },
           spacing: { slide: '40px' },
         },
-      }, input.policy).then((result: any) => {
-        return { type: 'accessibility', score: result ? this.accessibilityScore(result) : 0.75 };
-      }).catch(err => {
+      }, input.policy).then((result: any) => ({
+        type: 'accessibility',
+        score: result ? this.accessibilityScore(result) : 0.75,
+      })).catch(err => {
         console.warn('[Orchestrator] Accessibility checking failed:', err);
         return { type: 'accessibility', score: 0.5 };
       }),
+    ]);
 
-      // Readability Analysis
-      this.executeAgent('readability-analyzer', {
-        slides,
-        audience: input.audience,
-      }, input.policy).then((result: any) => {
-        return { type: 'readability', score: result?.overallScore ?? 0.75 };
-      }).catch(err => {
-        console.warn('[Orchestrator] Readability analysis failed:', err);
-        return { type: 'readability', score: 0.5 };
-      }),
-    ];
-
-    const results = await Promise.all(qualityPromises);
-    results.forEach(({ type, score }) => { scores[type] = score; });
-
-    return { checks, scores };
+    return {
+      checks,
+      scores: {
+        factCheck: factResult.score,
+        accessibility: accessibilityResult.score,
+      },
+    };
   }
 
   /** Derive a 0-1 accessibility score from the linter output */
