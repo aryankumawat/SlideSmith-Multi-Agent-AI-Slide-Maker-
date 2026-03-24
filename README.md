@@ -8,13 +8,15 @@ A production-ready, distributed multi-agent system for automated slide deck gene
 
 ## System Overview
 
-SlideSmith implements a **13-agent collaborative pipeline** using LLM orchestration patterns to transform unstructured input into production-ready presentation decks. The system employs intelligent model routing, parallel execution, and comprehensive validation to ensure output quality while optimizing for latency and cost.
+SlideSmith implements a **17-agent collaborative pipeline** using LLM orchestration patterns to transform unstructured input into production-ready presentation decks. The system employs intelligent model routing, parallel execution, and comprehensive validation to ensure output quality while optimizing for latency and cost.
 
 ### Key Architecture Components
 
-- **Distributed Agent Orchestration**: Coordinated multi-agent workflow with dependency resolution
+- **Distributed Agent Orchestration**: Coordinated multi-agent workflow with dependency resolution across 17 agents
 - **Adaptive Model Selection**: Dynamic routing based on task complexity and performance requirements
-- **Parallel Quality Assurance**: Concurrent validation across multiple dimensions (factual, accessibility, readability)
+- **6-Dimensional Quality Assurance**: Concurrent validation across factual accuracy, accessibility, readability, consistency, narrative arc, and coherence
+- **Free Image Generation**: Pollinations.ai integration for AI-generated slide visuals (no API key required)
+- **Narrative Intelligence**: Story arc auditing with hook/tension/evidence/resolution/CTA analysis
 - **Provider Abstraction**: Unified interface supporting Ollama, OpenAI, and custom LLM backends
 - **Semantic Export Engine**: Format-aware rendering with theme-consistent PDF and PPTX generation
 
@@ -24,31 +26,54 @@ SlideSmith implements a **13-agent collaborative pipeline** using LLM orchestrat
 
 ### Multi-Agent Pipeline
 
-The system orchestrates 13 specialized agents in a directed acyclic graph (DAG) workflow:
+The system orchestrates 17 specialized agents in a directed acyclic graph (DAG) workflow:
 
-| **Agent** | **Function** | **Execution Context** | **Model (Balanced Policy)** |
-|-----------|--------------|----------------------|----------------------------|
-| **Researcher** | Fact extraction, source validation, evidence synthesis | Research Phase | Phi-4 14B |
-| **Structurer** | Narrative arc planning, section decomposition, flow optimization | Structure Phase | Gemma3 4B |
-| **Slidewriter** | Content composition, block generation, citation mapping | Generation Phase | Gemma3 4B |
-| **Copy Tightener** | Lexical consistency, tone normalization, terminology unification | QA Phase | Gemma3 4B |
-| **Fact Checker** | Claim verification, citation validation, confidence scoring | QA Phase | Gemma3 4B |
-| **Data→Viz Planner** | Chart type selection, encoding optimization, visual clarity analysis | Enhancement Phase | Gemma3 4B |
-| **Media Finder** | Asset retrieval, alt-text generation, image sourcing | Enhancement Phase | Gemma3 4B |
-| **Speaker Notes Generator** | Presenter guidance, timing estimation, transition scripting | Enhancement Phase | Gemma3 4B |
-| **Accessibility Linter** | WCAG compliance, contrast analysis, readability validation | QA Phase | Gemma3 4B |
-| **Live Widget Planner** | Real-time data integration, endpoint validation, refresh strategy | Enhancement Phase | Gemma3 4B |
-| **Executive Summary** | Key point distillation, executive email generation | Finalization Phase | Gemma3 4B |
-| **Audience Adapter** | Content retargeting, complexity adjustment, tone recalibration | On-Demand | Gemma3 4B |
-| **Readability Analyzer** | Linguistic complexity scoring, audience-appropriateness validation | QA Phase | Gemma3 4B |
-| **PPTX Export Agent** | Native chart rendering, smart text wrapping, theme application | Export Phase | Rule-based (no LLM) |
+| # | **Agent** | **Function** | **Pipeline Step** | **Model (Balanced)** |
+|---|-----------|--------------|-------------------|---------------------|
+| 1 | **Researcher** | Fact extraction, source validation, evidence synthesis | Step 1: Research | Phi-4 14B |
+| 2 | **Structurer** | Narrative arc planning, section decomposition, flow optimization | Step 2: Structure | Gemma3 4B |
+| 3 | **Slide Layout Planner** | Assigns optimal visual layout (kpi, two-column, timeline, etc.) per slide before content is written | Step 2b: Layout Planning | Gemma3 4B |
+| 4 | **Slidewriter** | Content composition, block generation, citation mapping (uses layout hints) | Step 3: Generation | Gemma3 4B |
+| 5 | **Copy Tightener** | Lexical consistency, tone normalization, terminology unification | Step 3: Per-Section QA | Gemma3 4B |
+| 6 | **Readability Analyzer** | Linguistic complexity scoring, audience-appropriateness validation | Step 3: Per-Section QA | Gemma3 4B |
+| 7 | **Media Finder** | Asset retrieval, alt-text generation, image prompt creation | Step 3: Enhancement | Gemma3 4B |
+| 8 | **Data Viz Planner** | Chart type selection, encoding optimization, visual clarity analysis | Step 3: Enhancement | Gemma3 4B |
+| 9 | **Image Generation Dispatcher** | Turns Media Finder prompts into real images via Pollinations.ai (free, no API key) | Step 3b: Image Gen | Gemma3 4B |
+| 10 | **Fact Checker** | Claim verification, citation validation, confidence scoring | Step 4: Cross-Deck QA | Gemma3 4B |
+| 11 | **Accessibility Linter** | WCAG compliance, contrast analysis, structure validation | Step 4: Cross-Deck QA | Gemma3 4B |
+| 12 | **Deduplication & Coherence** | Detects duplicate content, repeated statistics, contradictory claims, thematic drift | Step 4: Cross-Deck QA | Phi-4 14B |
+| 13 | **Narrative Arc Auditor** | Evaluates story flow (hook/tension/evidence/resolution/CTA), flags weak transitions and pacing | Step 4: Cross-Deck QA | Phi-4 14B |
+| 14 | **Speaker Notes Generator** | Presenter guidance, timing estimation, transition scripting | Step 5: Enrichment | Gemma3 4B |
+| 15 | **Executive Summary** | Key point distillation, executive email generation | Step 7: Finalization | Gemma3 4B |
+| 16 | **Audience Adapter** | Content retargeting, complexity adjustment, tone recalibration | Step 8: On-Demand | Gemma3 4B |
+| 17 | **Live Widget Planner** | Real-time data integration, endpoint validation, refresh strategy | Enhancement | Gemma3 4B |
+
+#### Execution Pipeline Flow
+
+```
+Step 1:   Research                        → Researcher (Phi-4)
+Step 2:   Structure                       → Structurer (Gemma3)
+Step 2b:  Layout Planning (NEW)           → Slide Layout Planner (Gemma3)
+Step 3:   Per-Section Parallel Pipeline   → Slidewriter + Copy Tightener + Readability
+                                            + Media Finder + Data Viz Planner
+Step 3b:  Image Generation (NEW)          → Image Generation Dispatcher (Pollinations.ai)
+Step 4:   Cross-Deck QA (4 agents parallel, NEW expanded)
+          ├── Fact Checker
+          ├── Accessibility Linter
+          ├── Deduplication & Coherence (NEW)
+          └── Narrative Arc Auditor (NEW)
+Step 5:   Speaker Notes
+Step 6:   Final Assembly
+Step 7:   Executive Summary (optional)
+Step 8:   Audience Adaptation (optional)
+```
 
 #### Model Routing Policies
 
 The system supports three routing strategies that determine which LLM model is assigned to each agent:
 
 **1. Quality Policy** → Prioritizes output quality
-- **All agents** use **Phi-4 14B** (larger, more capable model)
+- **All 17 agents** use **Phi-4 14B** (except Image Gen Dispatcher which mainly builds URLs)
 - **Best for:** Production presentations, critical content, maximum accuracy
 - **Trade-off:** Slower execution (~5-7 minutes per deck), higher memory usage
 
@@ -58,8 +83,8 @@ The system supports three routing strategies that determine which LLM model is a
 - **Trade-off:** Lower quality output, less nuanced reasoning
 
 **3. Balanced Policy** (Default) → Optimizes for speed/quality trade-off
-- **Critical agents** (Researcher) use **Phi-4 14B** for accuracy
-- **Routine agents** (Slidewriter, Copy Tightener, etc.) use **Gemma3 4B** for speed
+- **Critical agents** (Researcher, Deduplication, Narrative Arc Auditor) use **Phi-4 14B** for accuracy
+- **Routine agents** (Slidewriter, Copy Tightener, Layout Planner, etc.) use **Gemma3 4B** for speed
 - **Best for:** Most use cases, production-ready output with reasonable performance
 - **Result:** ~3-5 minutes per deck with high-quality results
 
@@ -77,42 +102,56 @@ POST /api/multi-model-generate
 ```mermaid
 graph TB
     Client[Client Layer<br/>React + Next.js] --> API[API Layer<br/>/api/generate-deck<br/>/api/multi-model-generate]
-    
-    API --> Orchestrator[Orchestrator<br/>Multi-Agent DAG]
-    
-    Orchestrator --> A1[Researcher<br/>Phi-4 14B]
-    Orchestrator --> A2[Structurer<br/>Gemma3 4B]
-    Orchestrator --> A3[Slidewriter<br/>Gemma3 4B]
-    Orchestrator --> A4[Fact Checker<br/>Gemma3 4B]
-    Orchestrator --> A5[Copy Tightener<br/>Gemma3 4B]
-    Orchestrator --> A6[Accessibility Linter<br/>Gemma3 4B]
-    Orchestrator --> A7[Media Finder]
-    Orchestrator --> A8[Speaker Notes]
-    Orchestrator --> A9[Readability Analyzer<br/>Gemma3 4B]
-    
-    A1 --> LLM[LLM Provider<br/>Ollama/OpenAI]
-    A2 --> LLM
-    A3 --> LLM
-    A4 --> LLM
-    A5 --> LLM
-    A6 --> LLM
-    A9 --> LLM
-    
+
+    API --> Orchestrator[Orchestrator<br/>17-Agent DAG]
+
+    subgraph Step1_2["Steps 1-2: Research & Planning"]
+        A1[Researcher<br/>Phi-4 14B]
+        A2[Structurer<br/>Gemma3 4B]
+        A14[Slide Layout Planner<br/>Gemma3 4B]
+    end
+
+    subgraph Step3["Step 3: Per-Section Parallel"]
+        A3[Slidewriter<br/>Gemma3 4B]
+        A5[Copy Tightener]
+        A9[Readability Analyzer]
+        A7[Media Finder]
+        A6b[Data Viz Planner]
+    end
+
+    subgraph Step3b["Step 3b: Image Generation"]
+        A15[Image Gen Dispatcher<br/>Pollinations.ai]
+    end
+
+    subgraph Step4["Step 4: Cross-Deck QA (Parallel)"]
+        A4[Fact Checker]
+        A6[Accessibility Linter]
+        A16[Deduplication<br/>Phi-4 14B]
+        A17[Narrative Arc Auditor<br/>Phi-4 14B]
+    end
+
+    Orchestrator --> A1 --> A2 --> A14 --> A3
+    A3 --> A5 & A9 & A7 & A6b
+    A7 --> A15
+    A15 --> A4 & A6 & A16 & A17
+
+    A1 & A2 & A3 & A4 & A5 & A6 & A9 & A16 & A17 --> LLM[LLM Provider<br/>Ollama/OpenAI]
+    A15 --> Pollinations[Pollinations.ai<br/>Free Image Gen]
+
     LLM --> Ollama[Ollama Local<br/>Phi-4 + Gemma3]
     LLM --> OpenAI[OpenAI Cloud<br/>GPT-4 + GPT-3.5]
-    
+
     Orchestrator --> Export[Export Layer]
-    
     Export --> PDF[PDFKit]
     Export --> PPTX[PptxGenJS]
     Export --> JSON[JSON]
-    
-    A7 --> Unsplash[Unsplash API]
 ```
 
 **Performance:**
-- Parallel QA Pipeline: 4 concurrent validators (75% latency reduction)
-- Smart Model Routing: Task-aware model selection (60% cost optimization)
+- Parallel QA Pipeline: 4 concurrent validators in Step 4 (75% latency reduction)
+- Per-Section Streaming: 5 agents run in parallel per section in Step 3
+- Smart Model Routing: Task-aware model selection across 17 agents (60% cost optimization)
+- Free Image Generation: Pollinations.ai requires no API key or payment
 - Graceful Degradation: Timeout handling with exponential backoff (99.5% reliability)
 
 ---
@@ -136,7 +175,7 @@ graph TB
 - **Data Visualization**: Recharts (composable chart library) + Native PowerPoint charts
 - **PDF Generation**: PDFKit with theme-aware rendering and smart text wrapping
 - **PPTX Export**: Advanced PptxGenJS engine with **native chart rendering** (line, bar, pie, area, scatter)
-- **Image Integration**: Unsplash API (dynamic content-aware sourcing with keyword extraction)
+- **Image Generation**: Pollinations.ai (free AI image generation, no API key) + Unsplash API fallback
 - **Text Handling**: Intelligent word-wrap algorithms (no truncation, preserves full content)
 
 ### Quality Assurance
@@ -237,17 +276,30 @@ LLM_BASE_URL=https://api.openai.com/v1
 **Response Schema:**
 ```typescript
 {
-  id: string;
-  meta: {
-    title: string;
-    audience: string;
-    theme: string;
-    generatedAt: string;
+  deck: {
+    id: string;
+    meta: { title, audience, theme, date, duration, wordCount };
+    slides: Slide[];
+    quality: {
+      factCheckScore: number;       // 0-1
+      accessibilityScore: number;   // 0-1
+      readabilityScore: number;     // 0-1
+      consistencyScore: number;     // 0-1
+      narrativeScore: number;       // 0-1 (NEW — story arc quality)
+      coherenceScore: number;       // 0-1 (NEW — deduplication/coherence)
+    };
   };
-  slides: Slide[];
-  research: ResearchSnippet[];
-  outline: OutlineSection[];
-  qualityMetrics: QualityReport;
+  metadata: {
+    totalTokens, totalCost, processingTime;
+    qualityScores: { factCheck, accessibility, readability, consistency, narrative, coherence };
+  };
+  layoutPlan?: SlideLayoutPlannerOutput;      // NEW — layout decisions per slide
+  imageGeneration?: ImageGenOutput;           // NEW — generated image URLs
+  narrativeArc?: NarrativeArcOutput;          // NEW — story beat analysis
+  deduplication?: DeduplicationOutput;        // NEW — duplicate/coherence issues
+  executiveSummary?: ExecutiveSummaryOutput;
+  audienceAdaptation?: AudienceAdapterOutput;
+  qualityChecks?: QualityCheck[];
 }
 ```
 
@@ -347,19 +399,23 @@ src/
   │
   ├── lib/
   │   ├── multi-model/                 # Agent system core
-  │   │   ├── agents/                  # Individual agent implementations
+  │   │   ├── agents/                  # 17 specialized agent implementations
   │   │   │   ├── researcher.ts
   │   │   │   ├── structurer.ts
+  │   │   │   ├── slide-layout-planner.ts     # NEW — layout decisions
   │   │   │   ├── slidewriter.ts
   │   │   │   ├── copy-tightener.ts
   │   │   │   ├── fact-checker.ts
   │   │   │   ├── accessibility-linter.ts
+  │   │   │   ├── deduplication-agent.ts      # NEW — cross-deck coherence
+  │   │   │   ├── narrative-arc-auditor.ts    # NEW — story flow analysis
+  │   │   │   ├── image-generation-dispatcher.ts  # NEW — Pollinations.ai
   │   │   │   └── ...
   │   │   ├── base-agent.ts            # Abstract agent class
-  │   │   ├── orchestrator.ts          # DAG execution coordinator
+  │   │   ├── orchestrator.ts          # DAG execution coordinator (8 steps)
   │   │   ├── router.ts                # Model selection logic
   │   │   ├── schemas.ts               # Zod validation contracts
-  │   │   └── ollama-config.ts         # Model configuration
+  │   │   └── ollama-config.ts         # Model configuration (17 agents)
   │   │
   │   ├── llm.ts                       # LLM provider abstraction
   │   ├── deck-generator.ts            # Simplified generation pipeline
@@ -377,7 +433,7 @@ src/
 
 - **`app/api/multi-model-generate/`** - Full multi-agent pipeline with Researcher, Structurer, Slidewriter, and QA agents
 - **`app/api/generate-deck/`** - Streamlined single-pass generation for quick prototypes
-- **`lib/multi-model/agents/`** - 13 specialized agents (Researcher, Structurer, Slidewriter, Copy Tightener, Fact Checker, Accessibility Linter, Media Finder, Speaker Notes Generator, Data Viz Planner, Live Widget Planner, Executive Summary, Audience Adapter, Readability Analyzer)
+- **`lib/multi-model/agents/`** - 17 specialized agents (Researcher, Structurer, Slide Layout Planner, Slidewriter, Copy Tightener, Fact Checker, Accessibility Linter, Deduplication & Coherence, Narrative Arc Auditor, Image Generation Dispatcher, Media Finder, Speaker Notes Generator, Data Viz Planner, Live Widget Planner, Executive Summary, Audience Adapter, Readability Analyzer)
 - **`lib/pptx-advanced-exporter.ts`** - Native chart rendering, smart text wrapping, theme-aware PPTX generation
 - **`components/blocks/`** - Reusable slide content primitives (Heading, Bullets, Chart, Image, Code, Quote)
 - **`components/live-widgets/`** - Real-time data visualization (LiveChart, Ticker, Map, Countdown, Iframe)
@@ -411,17 +467,20 @@ interface AgentResponse {
 - PDF Export: ~0.3-0.4s
 - **Total End-to-End: ~4-7 minutes** (depends on slide count and complexity)
 
-**Multi-Model Pipeline (13-slide deck, Mixed Models):**
+**Multi-Model Pipeline (13-slide deck, 17 Agents, Mixed Models):**
 - Initialization: ~2s
-- Research Phase (Gemma3 4B): ~30-40s
+- Research Phase (Phi-4 14B): ~30-40s
 - Structure Phase (Gemma3 4B): ~15-25s
-- Slidewriter Phase (Gemma3 4B, parallel): ~120-180s
-- QA Pipeline (4 agents, parallel): ~20-30s
-  - Copy Tightener: ~8-12s
+- Layout Planning (Gemma3 4B): ~8-12s
+- Slidewriter + Per-Section QA (Gemma3 4B, parallel): ~120-180s
+  - Slidewriter + Copy Tightener + Readability + Media + DataViz per section
+- Image Generation (Pollinations.ai): ~5-15s
+- Cross-Deck QA Pipeline (4 agents, parallel): ~20-35s
   - Fact Checker: ~10-15s
   - Accessibility Linter: ~5-8s
-  - Readability Analyzer: ~5-8s
-- Enhancement Phase: ~15-25s
+  - Deduplication & Coherence (Phi-4 14B): ~10-15s
+  - Narrative Arc Auditor (Phi-4 14B): ~10-15s
+- Speaker Notes: ~10-15s
 - Export Phase: ~1-2s
 - **Total: ~3-5 minutes**
 
@@ -486,23 +545,27 @@ LLM_MODEL=gpt-4
 
 ## Quality Assurance
 
-### Validation Pipeline
+### 6-Dimensional Validation Pipeline
 
-1. **Input Validation**: Zod schema enforcement
-2. **Fact Checking**: Claim-source alignment scoring
-3. **Accessibility**: WCAG 2.1 Level AA compliance
-4. **Readability**: Flesch-Kincaid grade level analysis
-5. **Consistency**: Term frequency and tone deviation detection
+| Dimension | Agent | What it checks | Score |
+|-----------|-------|---------------|-------|
+| **Factual Accuracy** | Fact Checker | Claim-source alignment, citation validity | 0-1 |
+| **Accessibility** | Accessibility Linter | WCAG 2.1 AA compliance, contrast, structure | 0-1 |
+| **Readability** | Readability Analyzer | Flesch-Kincaid grade level, sentence complexity | 0-1 |
+| **Consistency** | Copy Tightener | Tone deviation, terminology unification | 0-1 |
+| **Narrative** | Narrative Arc Auditor | Story beats (hook/tension/evidence/CTA), transitions, pacing | 0-1 |
+| **Coherence** | Deduplication Agent | Duplicate content, repeated stats, contradictions, thematic drift | 0-1 |
 
 ### Metrics Tracking
 
-   ```typescript
+```typescript
 interface QualityMetrics {
-  factualAccuracy: number;      // 0-1 confidence score
-  accessibilityScore: number;   // 0-100 compliance score
-  readabilityGrade: number;     // Grade level (6-16)
-  toneConsistency: number;      // 0-1 deviation score
-  citationCoverage: number;     // Percentage of claims cited
+  factCheckScore: number;       // 0-1 claim verification confidence
+  accessibilityScore: number;   // 0-1 WCAG compliance score
+  readabilityScore: number;     // 0-1 audience-appropriate reading level
+  consistencyScore: number;     // 0-1 tone and terminology consistency
+  narrativeScore: number;       // 0-1 story arc completeness and flow
+  coherenceScore: number;       // 0-1 cross-slide deduplication and coherence
 }
 ```
 
@@ -559,9 +622,11 @@ To add a new agent:
 
 1. Extend `BaseAgent` class in `src/lib/multi-model/agents/`
 2. Implement `execute()` method with Zod schemas
-3. Register agent in `orchestrator.ts`
-4. Add model assignment in `ollama-config.ts`
-5. Update pipeline DAG if dependencies exist
+3. Add Zod schemas to `schemas.ts`
+4. Register agent in `orchestrator.ts` (import + add to `agentPairs`)
+5. Add model assignment in `ollama-config.ts` (all 4 policies: quality, speed, balanced, agent assignments)
+6. Wire into the pipeline step where it should run (research, structure, per-section, cross-deck QA, etc.)
+7. Update `OrchestratorOutput` if the agent produces new output data
 
 ---
 ## Support & Documentation
