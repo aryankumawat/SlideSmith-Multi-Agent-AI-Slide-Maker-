@@ -38,6 +38,7 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
 
 // Agent-specific model assignments
 export const AGENT_MODEL_ASSIGNMENTS: Record<string, string> = {
+  // Legacy: kept for backwards compat; actual routing uses the policies below
   // High-quality models for complex reasoning
   'researcher': 'phi4',
   'structurer': 'phi4',
@@ -53,11 +54,15 @@ export const AGENT_MODEL_ASSIGNMENTS: Record<string, string> = {
   'data-viz-planner': 'gemma3-4b',
   'media-finder': 'gemma3-4b',
   'live-widget-planner': 'gemma3-4b',
-  'readability-analyzer': 'gemma3-4b'
+  'readability-analyzer': 'gemma3-4b',
+  'slide-layout-planner': 'gemma3-4b',
+  'deduplication': 'phi4',
+  'narrative-arc-auditor': 'phi4',
+  'image-generation-dispatcher': 'gemma3-4b'
 };
 
 // Quality-based routing policies
-export const QUALITY_POLICY = {
+export const QUALITY_POLICY: Record<string, string> = {
   'researcher': 'phi4',
   'structurer': 'phi4',
   'slidewriter': 'phi4',
@@ -70,10 +75,14 @@ export const QUALITY_POLICY = {
   'live-widget-planner': 'phi4',
   'executive-summary': 'phi4',
   'audience-adapter': 'phi4',
-  'readability-analyzer': 'phi4'
+  'readability-analyzer': 'phi4',
+  'slide-layout-planner': 'phi4',
+  'deduplication': 'phi4',
+  'narrative-arc-auditor': 'phi4',
+  'image-generation-dispatcher': 'gemma3-4b'
 };
 
-export const SPEED_POLICY = {
+export const SPEED_POLICY: Record<string, string> = {
   'researcher': 'gemma3-4b',
   'structurer': 'gemma3-4b',
   'slidewriter': 'gemma3-4b',
@@ -86,10 +95,14 @@ export const SPEED_POLICY = {
   'live-widget-planner': 'gemma3-4b',
   'executive-summary': 'gemma3-4b',
   'audience-adapter': 'gemma3-4b',
-  'readability-analyzer': 'gemma3-4b'
+  'readability-analyzer': 'gemma3-4b',
+  'slide-layout-planner': 'gemma3-4b',
+  'deduplication': 'gemma3-4b',
+  'narrative-arc-auditor': 'gemma3-4b',
+  'image-generation-dispatcher': 'gemma3-4b'
 };
 
-export const BALANCED_POLICY = {
+export const BALANCED_POLICY: Record<string, string> = {
   'researcher': 'phi4',           // High quality for research
   'structurer': 'gemma3-4b',      // Fast for structure (was timing out)
   'slidewriter': 'gemma3-4b',     // Fast for content generation
@@ -102,7 +115,11 @@ export const BALANCED_POLICY = {
   'live-widget-planner': 'gemma3-4b',     // Fast for simple tasks
   'executive-summary': 'gemma3-4b',       // Fast for simple tasks
   'audience-adapter': 'gemma3-4b',        // Fast for simple tasks
-  'readability-analyzer': 'gemma3-4b'     // Fast for simple tasks
+  'readability-analyzer': 'gemma3-4b',     // Fast for simple tasks
+  'slide-layout-planner': 'gemma3-4b',    // Fast for layout decisions
+  'deduplication': 'phi4',                 // High quality for cross-deck analysis
+  'narrative-arc-auditor': 'phi4',         // High quality for narrative analysis
+  'image-generation-dispatcher': 'gemma3-4b' // Fast — mainly builds URLs
 };
 
 export function getModelForAgent(agentName: string, policy: string = 'balanced'): ModelConfig {

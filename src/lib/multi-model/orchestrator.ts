@@ -15,6 +15,10 @@ import {
   ExecutiveSummaryOutput,
   AudienceAdapterOutput,
 } from './schemas';
+import type { SlideLayoutPlannerOutput, LayoutPlanSection } from './agents/slide-layout-planner';
+import type { DeduplicationOutput } from './agents/deduplication-agent';
+import type { NarrativeArcOutput } from './agents/narrative-arc-auditor';
+import type { ImageGenOutput } from './agents/image-generation-dispatcher';
 
 // ============================================================================
 // MULTI-MODEL ORCHESTRATOR
@@ -50,6 +54,8 @@ export interface OrchestratorOutput {
       accessibility: number;
       readability: number;
       consistency: number;
+      narrative: number;
+      coherence: number;
     };
   };
   executiveSummary?: ExecutiveSummaryOutput;
@@ -58,6 +64,10 @@ export interface OrchestratorOutput {
   speakerNotes?: SpeakerNotesOutput;
   mediaEnhancements?: Record<string, MediaFinderOutput>;
   dataVizEnhancements?: Record<string, DataVizOutput>;
+  narrativeArc?: NarrativeArcOutput;
+  deduplication?: DeduplicationOutput;
+  imageGeneration?: ImageGenOutput;
+  layoutPlan?: SlideLayoutPlannerOutput;
 }
 
 export class MultiModelOrchestrator {
@@ -110,6 +120,20 @@ export class MultiModelOrchestrator {
         duration: input.duration,
       }, input.policy) as any;
 
+      // Step 2b: Layout Planning — decide slide layouts before writing content
+      console.log('[Orchestrator] Step 2b: Slide Layout Planning');
+      let layoutPlan: SlideLayoutPlannerOutput | undefined;
+      try {
+        layoutPlan = await this.executeAgent('slide-layout-planner', {
+          outline: structureResult.outline,
+          topic: input.topic,
+          audience: input.audience,
+          tone: input.tone,
+        }, input.policy) as SlideLayoutPlannerOutput;
+      } catch (err) {
+        console.warn('[Orchestrator] Layout planning failed, using defaults:', err);
+      }
+
       // Step 3: Streaming pipeline — Slidewriter + per-section QA + Media + DataViz
       // Copy Tightener and Readability run per-section as slides are ready.
       // FactChecker and Accessibility wait for the full deck (need cross-section context).
@@ -123,10 +147,30 @@ export class MultiModelOrchestrator {
       } = await this.generateSlidesStreamingPipeline(
         structureResult.outline,
         researchResult.snippets,
-        input
+        input,
+        layoutPlan
       );
 
-      // Step 4: Cross-deck QA (FactChecker + Accessibility — need full deck)
+      // Step 3b: Image Generation — turn Media Finder prompts into real images via Pollinations.ai
+      console.log('[Orchestrator] Step 3b: Image Generation (Pollinations.ai)');
+      let imageGenResult: ImageGenOutput | undefined;
+      try {
+        imageGenResult = await this.executeAgent('image-generation-dispatcher', {
+          slides,
+          mediaEnhancements,
+          themeStyle: input.theme || 'professional',
+          maxImagesPerSection: 1,
+        }, input.policy) as ImageGenOutput;
+
+        // Replace slides with image-enriched versions
+        if (imageGenResult?.enrichedSlides) {
+          slides.splice(0, slides.length, ...imageGenResult.enrichedSlides);
+        }
+      } catch (err) {
+        console.warn('[Orchestrator] Image generation failed:', err);
+      }
+
+      // Step 4: Cross-deck QA (FactChecker + Accessibility + Deduplication + Narrative Arc)
       console.log('[Orchestrator] Step 4: Cross-deck quality assurance');
       const crossDeckResults = await this.runCrossDeckQA(
         slides,
@@ -142,6 +186,8 @@ export class MultiModelOrchestrator {
           readability: perSectionScores.readability,
           factCheck: crossDeckResults.scores.factCheck,
           accessibility: crossDeckResults.scores.accessibility,
+          narrative: crossDeckResults.scores.narrative ?? 0.75,
+          coherence: crossDeckResults.scores.coherence ?? 0.75,
         },
       };
 
@@ -196,6 +242,8 @@ export class MultiModelOrchestrator {
         speakerNotes: speakerNotes || undefined,
         mediaEnhancements,
         dataVizEnhancements,
+        layoutPlan: layoutPlan || undefined,
+        imageGeneration: imageGenResult || undefined,
       };
 
       console.log(`[Orchestrator] Completed in ${processingTime}ms`);
@@ -218,7 +266,8 @@ export class MultiModelOrchestrator {
   private async generateSlidesStreamingPipeline(
     outline: DeckOutline,
     snippets: ResearchSnippet[],
-    input: OrchestratorInput
+    input: OrchestratorInput,
+    layoutPlan?: SlideLayoutPlannerOutput
   ): Promise<{
     slides: Slide[];
     mediaEnhancements: Record<string, MediaFinderOutput>;
@@ -232,7 +281,14 @@ export class MultiModelOrchestrator {
 
     const sectionResults = await Promise.all(
       outline.sections.map(async (section, sectionIndex) => {
-        // 1. Generate slides
+        // 1. Generate slides (with layout hints if available)
+        const sectionLayout = layoutPlan?.layoutPlan?.find(lp => lp.sectionId === section.id);
+        const layoutHints = sectionLayout?.slides?.map(s => ({
+          slideIndex: s.slideIndex,
+          layout: s.layout,
+          visualEmphasis: s.visualEmphasis,
+        }));
+
         const slidewriterInput = {
           section,
           researchSnippets: snippets,
@@ -245,6 +301,7 @@ export class MultiModelOrchestrator {
             totalSlides: outline.sections.length,
           },
           wordBudgets: { titleMax: 8, bulletMax: 12, bulletsPerSlide: 6 },
+          layoutHints,
         };
         const slideResult = await this.executeAgent('slidewriter', slidewriterInput, input.policy) as any;
         const sectionSlides: Slide[] = slideResult.slides || [];
@@ -344,7 +401,8 @@ export class MultiModelOrchestrator {
   ): Promise<{ checks: QualityCheck[]; scores: Record<string, number> }> {
     const checks: QualityCheck[] = [];
 
-    const [factResult, accessibilityResult] = await Promise.all([
+    const [factResult, accessibilityResult, deduplicationResult, narrativeResult] = await Promise.all([
+      // Fact Checker
       this.executeAgent('fact-checker', {
         slides,
         researchSnippets: snippets,
@@ -356,6 +414,7 @@ export class MultiModelOrchestrator {
         return { type: 'factCheck', score: 0.5 };
       }),
 
+      // Accessibility Linter
       this.executeAgent('accessibility-linter', {
         deck: { slides, title: input.topic },
         theme: input.theme || 'professional',
@@ -371,6 +430,33 @@ export class MultiModelOrchestrator {
         console.warn('[Orchestrator] Accessibility checking failed:', err);
         return { type: 'accessibility', score: 0.5 };
       }),
+
+      // Deduplication & Coherence
+      this.executeAgent('deduplication', {
+        slides,
+        topic: input.topic,
+        audience: input.audience,
+      }, input.policy).then((result: any) => {
+        if (result?.qualityChecks) checks.push(...result.qualityChecks);
+        return { type: 'coherence', score: result?.coherenceScore ?? 0.75 };
+      }).catch(err => {
+        console.warn('[Orchestrator] Deduplication check failed:', err);
+        return { type: 'coherence', score: 0.5 };
+      }),
+
+      // Narrative Arc Auditor
+      this.executeAgent('narrative-arc-auditor', {
+        slides,
+        topic: input.topic,
+        audience: input.audience,
+        tone: input.tone,
+      }, input.policy).then((result: any) => {
+        if (result?.qualityChecks) checks.push(...result.qualityChecks);
+        return { type: 'narrative', score: result?.overallNarrativeScore ?? 0.75 };
+      }).catch(err => {
+        console.warn('[Orchestrator] Narrative arc audit failed:', err);
+        return { type: 'narrative', score: 0.5 };
+      }),
     ]);
 
     return {
@@ -378,6 +464,8 @@ export class MultiModelOrchestrator {
       scores: {
         factCheck: factResult.score,
         accessibility: accessibilityResult.score,
+        coherence: deduplicationResult.score,
+        narrative: narrativeResult.score,
       },
     };
   }
@@ -601,6 +689,8 @@ export class MultiModelOrchestrator {
         accessibilityScore: qualityScores.accessibility ?? 0.75,
         readabilityScore: qualityScores.readability ?? 0.75,
         consistencyScore: qualityScores.consistency ?? 0.75,
+        narrativeScore: qualityScores.narrative ?? 0.75,
+        coherenceScore: qualityScores.coherence ?? 0.75,
       },
     };
   }
@@ -622,6 +712,8 @@ export class MultiModelOrchestrator {
         accessibility: qualityScores.accessibility ?? 0.75,
         readability: qualityScores.readability ?? 0.75,
         consistency: qualityScores.consistency ?? 0.75,
+        narrative: qualityScores.narrative ?? 0.75,
+        coherence: qualityScores.coherence ?? 0.75,
       },
     };
   }
@@ -648,6 +740,10 @@ export class MultiModelOrchestrator {
         { ExecutiveSummaryAgent },
         { AudienceAdapterAgent },
         { ReadabilityAnalyzerAgent },
+        { SlideLayoutPlannerAgent },
+        { DeduplicationAgent },
+        { NarrativeArcAuditorAgent },
+        { ImageGenerationDispatcherAgent },
       ] = await Promise.all([
         import('./agents/researcher'),
         import('./agents/structurer'),
@@ -662,6 +758,10 @@ export class MultiModelOrchestrator {
         import('./agents/executive-summary'),
         import('./agents/audience-adapter'),
         import('./agents/readability-analyzer'),
+        import('./agents/slide-layout-planner'),
+        import('./agents/deduplication-agent'),
+        import('./agents/narrative-arc-auditor'),
+        import('./agents/image-generation-dispatcher'),
       ]);
 
       const agentPairs: [string, BaseAgent][] = [
@@ -678,6 +778,10 @@ export class MultiModelOrchestrator {
         ['executive-summary', new ExecutiveSummaryAgent()],
         ['audience-adapter', new AudienceAdapterAgent()],
         ['readability-analyzer', new ReadabilityAnalyzerAgent()],
+        ['slide-layout-planner', new SlideLayoutPlannerAgent()],
+        ['deduplication', new DeduplicationAgent()],
+        ['narrative-arc-auditor', new NarrativeArcAuditorAgent()],
+        ['image-generation-dispatcher', new ImageGenerationDispatcherAgent()],
       ];
 
       for (const [name, agent] of agentPairs) {

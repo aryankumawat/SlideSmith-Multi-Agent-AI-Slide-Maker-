@@ -152,6 +152,8 @@ export const DeckSchema = z.object({
     accessibilityScore: z.number().min(0).max(1).optional(),
     readabilityScore: z.number().min(0).max(1).optional(),
     consistencyScore: z.number().min(0).max(1).optional(),
+    narrativeScore: z.number().min(0).max(1).optional(),
+    coherenceScore: z.number().min(0).max(1).optional(),
   }).optional(),
 });
 
@@ -497,3 +499,147 @@ export const AudienceAdapterOutputSchema = z.object({
 
 export type AudienceAdapterInput = z.infer<typeof AudienceAdapterInputSchema>;
 export type AudienceAdapterOutput = z.infer<typeof AudienceAdapterOutputSchema>;
+
+// Deduplication & Coherence Schemas
+export const DuplicateIssueSchema = z.object({
+  type: z.enum(['duplicate-content', 'repeated-statistic', 'contradictory-claim', 'thematic-drift']),
+  severity: z.enum(['low', 'medium', 'high']),
+  slideIds: z.array(z.string()),
+  description: z.string(),
+  suggestion: z.string(),
+  autoFixable: z.boolean(),
+});
+
+export const DeduplicationInputSchema = z.object({
+  slides: z.array(z.any()),
+  topic: z.string(),
+  audience: z.string(),
+});
+
+export const DeduplicationOutputSchema = z.object({
+  issues: z.array(DuplicateIssueSchema),
+  coherenceScore: z.number().min(0).max(1),
+  qualityChecks: z.array(QualityCheckSchema),
+  metadata: z.object({
+    totalIssues: z.number(),
+    duplicateContentCount: z.number(),
+    repeatedStatCount: z.number(),
+    contradictionCount: z.number(),
+    thematicDriftCount: z.number(),
+  }),
+});
+
+export type DuplicateIssue = z.infer<typeof DuplicateIssueSchema>;
+export type DeduplicationInput = z.infer<typeof DeduplicationInputSchema>;
+export type DeduplicationOutput = z.infer<typeof DeduplicationOutputSchema>;
+
+// Narrative Arc Auditor Schemas
+export const StoryBeatSchema = z.object({
+  name: z.enum(['hook', 'context', 'tension', 'evidence', 'resolution', 'call-to-action']),
+  present: z.boolean(),
+  slideId: z.string().optional(),
+  strength: z.number().min(0).max(1),
+  feedback: z.string(),
+});
+
+export const TransitionIssueSchema = z.object({
+  fromSlideId: z.string(),
+  toSlideId: z.string(),
+  severity: z.enum(['low', 'medium', 'high']),
+  description: z.string(),
+  suggestion: z.string(),
+});
+
+export const NarrativeArcInputSchema = z.object({
+  slides: z.array(z.any()),
+  topic: z.string(),
+  audience: z.string(),
+  tone: z.string(),
+});
+
+export const NarrativeArcOutputSchema = z.object({
+  storyBeats: z.array(StoryBeatSchema),
+  transitionIssues: z.array(TransitionIssueSchema),
+  overallNarrativeScore: z.number().min(0).max(1),
+  pacingScore: z.number().min(0).max(1),
+  qualityChecks: z.array(QualityCheckSchema),
+  summary: z.string(),
+  metadata: z.object({
+    totalSlides: z.number(),
+    missingBeats: z.array(z.string()),
+    weakTransitions: z.number(),
+    strongSections: z.array(z.string()),
+  }),
+});
+
+export type StoryBeat = z.infer<typeof StoryBeatSchema>;
+export type TransitionIssue = z.infer<typeof TransitionIssueSchema>;
+export type NarrativeArcInput = z.infer<typeof NarrativeArcInputSchema>;
+export type NarrativeArcOutput = z.infer<typeof NarrativeArcOutputSchema>;
+
+// Image Generation Dispatcher Schemas
+export const GeneratedImageSchema = z.object({
+  slideId: z.string(),
+  sectionId: z.string(),
+  url: z.string(),
+  alt: z.string(),
+  prompt: z.string(),
+  width: z.number(),
+  height: z.number(),
+});
+
+export const ImageGenInputSchema = z.object({
+  slides: z.array(z.any()),
+  mediaEnhancements: z.record(z.any()),
+  themeStyle: z.string(),
+  maxImagesPerSection: z.number(),
+});
+
+export const ImageGenOutputSchema = z.object({
+  generatedImages: z.array(GeneratedImageSchema),
+  enrichedSlides: z.array(z.any()),
+  metadata: z.object({
+    totalGenerated: z.number(),
+    sectionsWithImages: z.number(),
+    failedGenerations: z.number(),
+  }),
+});
+
+export type GeneratedImage = z.infer<typeof GeneratedImageSchema>;
+export type ImageGenInput = z.infer<typeof ImageGenInputSchema>;
+export type ImageGenOutput = z.infer<typeof ImageGenOutputSchema>;
+
+// Slide Layout Planner Schemas
+export const LayoutPlanSlideSchema = z.object({
+  slideIndex: z.number(),
+  layout: z.enum(['title', 'title+bullets', 'two-column', 'comparison', 'kpi', 'timeline', 'quote', 'diagram']),
+  rationale: z.string(),
+  visualEmphasis: z.enum(['text-heavy', 'visual-heavy', 'balanced']),
+});
+
+export const LayoutPlanSectionSchema = z.object({
+  sectionId: z.string(),
+  slides: z.array(LayoutPlanSlideSchema),
+});
+
+export const SlideLayoutPlannerInputSchema = z.object({
+  outline: z.any(),
+  topic: z.string(),
+  audience: z.string(),
+  tone: z.string(),
+});
+
+export const SlideLayoutPlannerOutputSchema = z.object({
+  layoutPlan: z.array(LayoutPlanSectionSchema),
+  metadata: z.object({
+    totalSlides: z.number(),
+    layoutVariety: z.number(),
+    visualHeavyCount: z.number(),
+    textHeavyCount: z.number(),
+  }),
+});
+
+export type LayoutPlanSlide = z.infer<typeof LayoutPlanSlideSchema>;
+export type LayoutPlanSection = z.infer<typeof LayoutPlanSectionSchema>;
+export type SlideLayoutPlannerInput = z.infer<typeof SlideLayoutPlannerInputSchema>;
+export type SlideLayoutPlannerOutput = z.infer<typeof SlideLayoutPlannerOutputSchema>;

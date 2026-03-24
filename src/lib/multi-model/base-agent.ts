@@ -13,7 +13,7 @@ export interface AgentConfig {
 }
 
 export abstract class BaseAgent {
-  protected config: AgentConfig;
+  public readonly config: AgentConfig;
   protected model: ModelConfig | null = null;
   protected router: any; // Will be injected
 
