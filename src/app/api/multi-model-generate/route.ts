@@ -25,6 +25,10 @@ const MultiModelRequestSchema = z.object({
   }).optional(),
 });
 
+// Module-level singleton — agents are initialized once per server process,
+// not on every request (avoids 17 dynamic imports on each POST).
+const orchestrator = new MultiModelOrchestrator();
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting
@@ -38,11 +42,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validatedData = MultiModelRequestSchema.parse(body);
-    
+
     console.log('[Multi-Model API] Starting generation with policy:', validatedData.policy);
-    
-    // Initialize orchestrator
-    const orchestrator = new MultiModelOrchestrator();
     
     // Generate presentation — pass all flags into the pipeline directly
     const result = await orchestrator.generatePresentation({
@@ -134,7 +135,6 @@ export async function GET() {
 // Health check endpoint
 export async function GET_health() {
   try {
-    const orchestrator = new MultiModelOrchestrator();
     const status = orchestrator.getRouterStatus();
     
     return NextResponse.json({
@@ -158,8 +158,6 @@ export async function GET_health() {
 // Status endpoint for monitoring
 export async function GET_status() {
   try {
-    const orchestrator = new MultiModelOrchestrator();
-    
     return NextResponse.json({
       orchestrator: {
         agents: Object.fromEntries(orchestrator.getAgentStatus()),
