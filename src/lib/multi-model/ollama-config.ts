@@ -1,8 +1,10 @@
 import { ModelConfig } from './schemas';
 
 // ============================================================================
-// OLLAMA CONFIGURATION FOR MULTI-MODEL AGENTS
+// MODEL CONFIGURATION — Ollama (local) + Groq (free cloud tier)
 // ============================================================================
+
+// ---- Ollama (always available, no API key needed) ----
 
 export const OLLAMA_MODELS: Record<string, ModelConfig> = {
   // High-quality model for complex tasks (planning, verification)
@@ -15,12 +17,12 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
     maxTokens: 8000,
     temperature: 0.7,
     capabilities: ['planning', 'verification', 'analysis', 'reasoning', 'writing', 'editing'],
-    costPerToken: 0.0, // Local, no cost
+    costPerToken: 0.0,
     speed: 'medium',
-    quality: 'high'
+    quality: 'high',
   },
 
-  // Fast model for simple tasks
+  // Fast model for content generation
   'gemma3-4b': {
     name: 'gemma3-4b',
     provider: 'ollama',
@@ -32,9 +34,53 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
     capabilities: ['writing', 'editing', 'generation', 'formatting', 'validation', 'simple-tasks'],
     costPerToken: 0.0,
     speed: 'fast',
-    quality: 'medium'
-  }
+    quality: 'medium',
+  },
 };
+
+// ---- Groq (free tier, OpenAI-compatible, gated on GROQ_API_KEY) ----
+// Free tier: ~30 req/min, 14,400 req/day for llama-3.3-70b
+// Sign up at console.groq.com — no credit card required
+
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_BASE_URL = 'https://api.groq.com/openai';
+
+export const GROQ_MODELS: Record<string, ModelConfig> = GROQ_API_KEY
+  ? {
+      // Best quality on Groq free tier — use for reasoning-heavy agents
+      'groq-llama-3.3-70b': {
+        name: 'groq-llama-3.3-70b',
+        provider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+        apiKey: GROQ_API_KEY,
+        baseUrl: GROQ_BASE_URL,
+        maxTokens: 8000,
+        temperature: 0.7,
+        capabilities: [
+          'planning', 'verification', 'analysis', 'reasoning',
+          'writing', 'editing', 'generation', 'formatting',
+        ],
+        costPerToken: 0.0,
+        speed: 'fast',
+        quality: 'high',
+      },
+
+      // Fastest Groq model — use for simple/content generation agents
+      'groq-llama-3.1-8b': {
+        name: 'groq-llama-3.1-8b',
+        provider: 'groq',
+        model: 'llama-3.1-8b-instant',
+        apiKey: GROQ_API_KEY,
+        baseUrl: GROQ_BASE_URL,
+        maxTokens: 4000,
+        temperature: 0.7,
+        capabilities: ['writing', 'editing', 'generation', 'formatting', 'simple-tasks'],
+        costPerToken: 0.0,
+        speed: 'fast',
+        quality: 'medium',
+      },
+    }
+  : {};
 
 // Agent-specific model assignments
 export const AGENT_MODEL_ASSIGNMENTS: Record<string, string> = {
@@ -142,7 +188,7 @@ export function getModelForAgent(agentName: string, policy: string = 'balanced')
 }
 
 export function getAllAvailableModels(): ModelConfig[] {
-  return Object.values(OLLAMA_MODELS);
+  return [...Object.values(OLLAMA_MODELS), ...Object.values(GROQ_MODELS)];
 }
 
 export function getModelByName(name: string): ModelConfig | undefined {
