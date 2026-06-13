@@ -287,8 +287,8 @@ Return as JSON:
         goal: 'Key insights and information',
         estSlides: slideCount,
         keyPoints: ['Key point 1', 'Key point 2', 'Key point 3'],
+        order: index + 1,
         chartSuggested: false,
-        chartReason: ''
       };
     }
 
@@ -303,7 +303,6 @@ Return as JSON:
         goal: 'Key insights and information',
         keyPoints: ['Key point 1', 'Key point 2', 'Key point 3'],
         chartSuggested: false,
-        chartReason: ''
       };
     }
 
@@ -368,7 +367,7 @@ Return only the title, no quotes or extra text.`;
       input.audience.toLowerCase().includes(key)
     );
 
-    return audienceMap[audienceKey] || 'Comprehensive Overview';
+    return (audienceKey ? audienceMap[audienceKey] : undefined) || 'Comprehensive Overview';
   }
 
   private async generateConclusion(input: StructurerInput, sections: OutlineSection[]): Promise<string> {
