@@ -441,7 +441,8 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
         '2xl': '1.5rem',
         '3xl': '1.875rem',
         '4xl': '2.25rem',
-      },
+        '5xl': '3rem',
+        '6xl': '3.75rem',      },
       fontWeight: {
         normal: '400',
         medium: '500',
@@ -467,7 +468,7 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
       sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
       lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-    },
+      xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',    },
     animations: {
       duration: {
         fast: '150ms',
@@ -508,7 +509,8 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
         '2xl': '1.5rem',
         '3xl': '1.875rem',
         '4xl': '2.25rem',
-      },
+        '5xl': '3rem',
+        '6xl': '3.75rem',      },
       fontWeight: {
         normal: '400',
         medium: '500',
@@ -534,7 +536,7 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
       sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
       lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-    },
+      xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',    },
     animations: {
       duration: {
         fast: '150ms',
@@ -575,7 +577,8 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
         '2xl': '1.5rem',
         '3xl': '1.875rem',
         '4xl': '2.25rem',
-      },
+        '5xl': '3rem',
+        '6xl': '3.75rem',      },
       fontWeight: {
         normal: '400',
         medium: '500',
@@ -601,7 +604,7 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
       sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
       lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-    },
+      xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',    },
     animations: {
       duration: {
         fast: '150ms',
@@ -642,7 +645,8 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
         '2xl': '1.5rem',
         '3xl': '1.875rem',
         '4xl': '2.25rem',
-      },
+        '5xl': '3rem',
+        '6xl': '3.75rem',      },
       fontWeight: {
         normal: '400',
         medium: '500',
@@ -668,7 +672,7 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
       sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
       lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-    },
+      xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',    },
     animations: {
       duration: {
         fast: '150ms',
@@ -709,7 +713,8 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
         '2xl': '1.5rem',
         '3xl': '1.875rem',
         '4xl': '2.25rem',
-      },
+        '5xl': '3rem',
+        '6xl': '3.75rem',      },
       fontWeight: {
         normal: '400',
         medium: '500',
@@ -735,7 +740,7 @@ export const themeConfigs: Record<Theme, ThemeConfig> = {
       sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
       lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-    },
+      xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',    },
     animations: {
       duration: {
         fast: '150ms',

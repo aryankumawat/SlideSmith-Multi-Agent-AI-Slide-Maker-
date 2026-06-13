@@ -126,14 +126,14 @@ export class FactCheckerAgent extends BaseAgent {
 
     for (const block of slide.blocks) {
       if (block.type === 'Heading' && 'text' in block) {
-        const claim = this.analyzeTextForClaims(block.text, block.id);
+        const claim = this.analyzeTextForClaims(block.text);
         if (claim) claims.push(claim);
       } else if (block.type === 'Subheading' && 'text' in block) {
-        const claim = this.analyzeTextForClaims(block.text, block.id);
+        const claim = this.analyzeTextForClaims(block.text);
         if (claim) claims.push(claim);
       } else if (block.type === 'Bullets' && 'items' in block) {
         for (const item of block.items) {
-          const claim = this.analyzeTextForClaims(item, block.id);
+          const claim = this.analyzeTextForClaims(item);
           if (claim) claims.push(claim);
         }
       }

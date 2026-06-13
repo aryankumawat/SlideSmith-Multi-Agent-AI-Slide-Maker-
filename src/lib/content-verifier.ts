@@ -32,7 +32,7 @@ export class ContentVerifier {
     let maxScore = 0;
 
     // Verify deck metadata
-    const metadataIssues = this.verifyMetadata(deck.meta);
+    const metadataIssues = this.verifyMetadata({ title: deck.title, author: deck.metadata?.author });
     issues.push(...metadataIssues);
 
     // Verify slides
@@ -69,7 +69,7 @@ export class ContentVerifier {
     };
   }
 
-  private verifyMetadata(meta: Deck['meta']): VerificationIssue[] {
+  private verifyMetadata(meta: { title: string; author?: string }): VerificationIssue[] {
     const issues: VerificationIssue[] = [];
 
     if (!meta.title || meta.title.trim().length === 0) {
@@ -187,7 +187,6 @@ export class ContentVerifier {
             type: 'error',
             severity: 'high',
             slideId,
-            blockId: block.id,
             message: 'Heading block is empty',
             suggestion: 'Add text to the heading block'
           });
@@ -196,7 +195,6 @@ export class ContentVerifier {
             type: 'warning',
             severity: 'medium',
             slideId,
-            blockId: block.id,
             message: 'Heading is too long',
             suggestion: 'Keep headings under 80 characters for better readability'
           });
@@ -209,7 +207,6 @@ export class ContentVerifier {
             type: 'error',
             severity: 'high',
             slideId,
-            blockId: block.id,
             message: 'Subheading block is empty',
             suggestion: 'Add text to the subheading block'
           });
@@ -222,7 +219,6 @@ export class ContentVerifier {
             type: 'error',
             severity: 'high',
             slideId,
-            blockId: block.id,
             message: 'Markdown block is empty',
             suggestion: 'Add content to the markdown block'
           });
@@ -235,7 +231,6 @@ export class ContentVerifier {
             type: 'error',
             severity: 'high',
             slideId,
-            blockId: block.id,
             message: 'Bullet list is empty',
             suggestion: 'Add items to the bullet list'
           });
@@ -244,7 +239,6 @@ export class ContentVerifier {
             type: 'warning',
             severity: 'medium',
             slideId,
-            blockId: block.id,
             message: 'Too many bullet points',
             suggestion: 'Limit bullet points to 8 or fewer for better readability'
           });
@@ -257,7 +251,6 @@ export class ContentVerifier {
                 type: 'warning',
                 severity: 'low',
                 slideId,
-                blockId: block.id,
                 message: `Bullet point ${i + 1} is empty`,
                 suggestion: 'Remove empty bullet points or add content'
               });
@@ -266,7 +259,6 @@ export class ContentVerifier {
                 type: 'warning',
                 severity: 'low',
                 slideId,
-                blockId: block.id,
                 message: `Bullet point ${i + 1} is too long`,
                 suggestion: 'Keep bullet points under 100 characters'
               });
@@ -281,7 +273,6 @@ export class ContentVerifier {
             type: 'error',
             severity: 'high',
             slideId,
-            blockId: block.id,
             message: 'Quote block is empty',
             suggestion: 'Add text to the quote block'
           });
@@ -290,7 +281,6 @@ export class ContentVerifier {
             type: 'warning',
             severity: 'medium',
             slideId,
-            blockId: block.id,
             message: 'Quote is too long',
             suggestion: 'Keep quotes under 200 characters for better readability'
           });
@@ -298,21 +288,19 @@ export class ContentVerifier {
         break;
 
       case 'Code':
-        if (!block.content || block.content.trim().length === 0) {
+        if (!block.code || block.code.trim().length === 0) {
           issues.push({
             type: 'error',
             severity: 'high',
             slideId,
-            blockId: block.id,
             message: 'Code block is empty',
             suggestion: 'Add code to the code block'
           });
-        } else if (block.content.length > 500) {
+        } else if (block.code.length > 500) {
           issues.push({
             type: 'warning',
             severity: 'medium',
             slideId,
-            blockId: block.id,
             message: 'Code block is too long',
             suggestion: 'Consider shortening the code or splitting it across multiple slides'
           });
@@ -394,7 +382,7 @@ export class ContentVerifier {
       case 'Bullets':
         return block.items.join(' ');
       case 'Code':
-        return block.content || '';
+        return block.code || '';
       default:
         return '';
     }

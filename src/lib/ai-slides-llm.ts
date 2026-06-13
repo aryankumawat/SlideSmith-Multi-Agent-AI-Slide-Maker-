@@ -127,7 +127,7 @@ OUTPUT (JSON only):
       }
       
       // Remove any text after the last ] or }
-      const jsonEnd = cleanedResponse.lastIndexOf(/[\]\}]/);
+      const jsonEnd = Math.max(cleanedResponse.lastIndexOf(']'), cleanedResponse.lastIndexOf('}'));
       if (jsonEnd > 0 && jsonEnd < cleanedResponse.length - 1) {
         cleanedResponse = cleanedResponse.substring(0, jsonEnd + 1);
       }

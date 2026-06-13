@@ -59,7 +59,7 @@ export function CodeBlock({
             fontFamily: 'JetBrains Mono, Consolas, Monaco, monospace',
           }}
         >
-          <code>{block.content}</code>
+          <code>{block.code}</code>
         </pre>
       </div>
     </BaseBlock>

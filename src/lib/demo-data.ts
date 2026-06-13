@@ -2,14 +2,14 @@ import { Deck, Theme } from './schema';
 
 export const DEMO_DECK: Deck = {
   id: 'demo-deck-alcohol-trends',
-  meta: {
-    title: 'Alcohol Use Trends in Australia',
-    subtitle: 'A Policy Perspective on Age-Group Patterns',
+  title: 'Alcohol Use Trends in Australia',
+  subtitle: 'A Policy Perspective on Age-Group Patterns',
+  theme: 'DeepSpace' as Theme,
+  metadata: {
+    createdAt: '2024-01-15T00:00:00.000Z',
+    updatedAt: '2024-01-15T00:00:00.000Z',
+    version: '1',
     author: 'AI Slide Maker',
-    date: '2024-01-15',
-    audience: 'Policy stakeholders',
-    tone: 'Analytical, non-sensational',
-    theme: 'DeepSpace' as Theme,
   },
   slides: [
     {
@@ -77,7 +77,7 @@ export const DEMO_DECK: Deck = {
         },
         {
           type: 'Image',
-          url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop',
+          src: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop',
           alt: 'Data analysis visualization',
         },
         {
@@ -102,17 +102,14 @@ export const DEMO_DECK: Deck = {
         },
         {
           type: 'Chart',
-          data: [
-            { age: '18-24', consumption: 65 },
-            { age: '25-34', consumption: 78 },
-            { age: '35-44', consumption: 82 },
-            { age: '45-54', consumption: 75 },
-            { age: '55-64', consumption: 68 },
-            { age: '65+', consumption: 45 },
-          ],
-          x: 'age',
-          y: 'consumption',
-          kind: 'bar',
+          data: {
+            labels: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'],
+            datasets: [{
+              label: 'Consumption',
+              data: [65, 78, 82, 75, 68, 45],
+            }],
+          },
+          chartType: 'bar',
         },
       ],
       notes: 'Point out the peak consumption in the 35-44 age group and the decline in older age groups. This sets up the discussion of age-specific patterns.',

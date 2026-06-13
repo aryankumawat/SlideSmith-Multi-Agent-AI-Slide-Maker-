@@ -45,6 +45,7 @@ export default function StudioPage() {
   // Generate form state
   const [generateForm, setGenerateForm] = useState<GenerateRequest>({
     topic: '',
+    mode: 'plan',
     detail: '',
     tone: 'Professional',
     audience: 'General audience',
@@ -155,14 +156,14 @@ export default function StudioPage() {
     // Convert PDF outline to deck format
     const generatedDeck: Deck = {
       id: `deck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      meta: {
-        title: outline.title,
-        subtitle: outline.abstract,
+      title: outline.title,
+      subtitle: outline.abstract,
+      theme: 'Academic' as Theme,
+      metadata: {
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1',
         author: 'AI Slide Maker',
-        date: new Date().toISOString().split('T')[0],
-        audience: 'Academic audience',
-        tone: 'Academic',
-        theme: 'Academic' as Theme,
       },
       slides: outline.agenda.map((section: any, index: number) => ({
         id: `slide-${index + 1}`,
@@ -298,7 +299,7 @@ export default function StudioPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${deck.meta.title}.pdf`;
+      a.download = `${deck.title}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -341,7 +342,7 @@ export default function StudioPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${deck.meta.title}.pptx`;
+      a.download = `${deck.title}.pptx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -405,6 +406,7 @@ export default function StudioPage() {
   const handleLoadDemoTopic = useCallback((topic: typeof DEMO_TOPICS[0]) => {
     setGenerateForm({
       topic: topic.topic,
+      mode: 'plan',
       detail: topic.detail,
       tone: topic.tone,
       audience: topic.audience,
@@ -655,7 +657,7 @@ export default function StudioPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {deck.meta.title}
+              {deck.title}
             </h1>
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {deck.slides.length} slides
@@ -731,15 +733,15 @@ export default function StudioPage() {
                 <CardContent className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-gray-500">Title</label>
-                    <p className="text-sm">{deck.meta.title}</p>
+                    <p className="text-sm">{deck.title}</p>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500">Theme</label>
-                    <p className="text-sm">{deck.meta.theme}</p>
+                    <p className="text-sm">{deck.theme}</p>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500">Audience</label>
-                    <p className="text-sm">{deck.meta.audience}</p>
+                    <p className="text-sm">{deck.subtitle}</p>
                   </div>
                 </CardContent>
               </Card>

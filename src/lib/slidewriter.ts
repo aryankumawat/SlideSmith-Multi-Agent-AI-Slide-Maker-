@@ -223,22 +223,19 @@ export function createTitleSlide(title: string, subtitle: string): Slide {
     animation: 'hero',
     blocks: [
       {
-        id: generateId('heading'),
         type: 'Heading',
         text: title,
         animation: 'slideInFromTop'
       },
       {
-        id: generateId('subheading'),
         type: 'Subheading',
         text: subtitle,
         animation: 'fadeIn'
       },
       {
-        id: generateId('markdown'),
         type: 'Markdown',
         md: `**Welcome to this engaging presentation**\n\n*Prepared with AI-powered insights and dynamic visualizations*`,
-        animation: 'slideInFromBottom'
+        animation: 'slideInFromLeft'
       }
     ],
     notes: `Welcome the audience warmly. Introduce yourself and set the stage for an engaging presentation. Mention that this presentation includes dynamic content and interactive elements. Build excitement about what they'll learn.`,
@@ -252,25 +249,21 @@ export function createAgendaSlide(agenda: OutlineItem[]): Slide {
     animation: 'fadeIn',
     blocks: [
       {
-        id: generateId('heading'),
         type: 'Heading',
         text: 'Agenda Overview',
         animation: 'slideInFromTop'
       },
       {
-        id: generateId('markdown'),
         type: 'Markdown',
         md: `**What we'll cover today:**\n\nA comprehensive journey through key topics with interactive elements and actionable insights.`,
         animation: 'slideInFromLeft'
       },
       {
-        id: generateId('bullets'),
         type: 'Bullets',
         items: agenda.map((item, index) => `${index + 1}. **${item.title}** (${item.slideCount} slides) - ${item.objective}`),
         animation: 'staggerIn'
       },
       {
-        id: generateId('quote'),
         type: 'Quote',
         text: "A well-structured presentation is the foundation of effective communication.",
         author: 'Presentation Expert',
@@ -288,30 +281,20 @@ export function createConclusionSlide(conclusion: string, references: string[]):
     animation: 'slideInFromBottom',
     blocks: [
       {
-        id: generateId('heading'),
         type: 'Heading',
         text: 'Key Takeaways',
         animation: 'slideInFromTop'
       },
       {
-        id: generateId('markdown'),
         type: 'Markdown',
         md: `**Summary:**\n\n${conclusion}\n\n**Next Steps:**\n• Review the key points discussed\n• Consider how to apply these insights\n• Explore additional resources provided`,
         animation: 'slideInFromLeft'
       },
-      ...(references.length > 0 ? [{
-        id: generateId('subheading'),
-        type: 'Subheading',
-        text: 'Additional Resources',
-        animation: 'fadeIn'
-      }, {
-        id: generateId('bullets'),
-        type: 'Bullets',
-        items: references,
-        animation: 'staggerIn'
-      }] : []),
+      ...(references.length > 0 ? [
+        { type: 'Subheading' as const, text: 'Additional Resources', animation: 'fadeIn' as const },
+        { type: 'Bullets' as const, items: references, animation: 'staggerIn' as const }
+      ] : []),
       {
-        id: generateId('quote'),
         type: 'Quote',
         text: "The best presentations don't just inform—they inspire action.",
         author: 'Communication Expert',
@@ -329,25 +312,21 @@ export function createThankYouSlide(): Slide {
     animation: 'hero',
     blocks: [
       {
-        id: generateId('heading'),
         type: 'Heading',
         text: 'Thank You',
         animation: 'bounceIn'
       },
       {
-        id: generateId('subheading'),
         type: 'Subheading',
         text: 'Questions & Discussion',
         animation: 'fadeIn'
       },
       {
-        id: generateId('markdown'),
         type: 'Markdown',
         md: `**Contact Information:**\n\n*Ready to continue the conversation*\n\n📧 Email: your.email@example.com\n💼 LinkedIn: linkedin.com/in/yourprofile\n🐦 Twitter: @yourhandle`,
-        animation: 'slideInFromBottom'
+        animation: 'slideInFromLeft'
       },
       {
-        id: generateId('quote'),
         type: 'Quote',
         text: "Great presentations create lasting connections and inspire meaningful conversations.",
         author: 'Presentation Expert',

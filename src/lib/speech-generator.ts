@@ -87,7 +87,7 @@ export class SpeechGenerator {
     
     try {
       const response = await this.llm.generateContent(prompt);
-      return response.content;
+      return response;
     } catch (error) {
       console.error('Error generating slide script:', error);
       return this.generateFallbackScript(slide, config);
@@ -164,7 +164,7 @@ Generate a speech script that would take approximately ${Math.round(config.durat
         case 'Quote':
           return `> ${block.text}`;
         case 'Code':
-          return `\`\`\`${block.language}\n${block.content}\n\`\`\``;
+          return `\`\`\`${block.language}\n${block.code}\n\`\`\``;
         default:
           return '';
       }

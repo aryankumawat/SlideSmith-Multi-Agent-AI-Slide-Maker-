@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type Theme = "DeepSpace" | "Ultraviolet" | "Minimal" | "Corporate" | "NeonGrid";
+export type Theme = "DeepSpace" | "Ultraviolet" | "Minimal" | "Corporate" | "NeonGrid" | "Academic" | "Conference" | "Journal" | "Thesis" | "Beamer";
 
 export type AnimationType = 
   | "fadeIn" 

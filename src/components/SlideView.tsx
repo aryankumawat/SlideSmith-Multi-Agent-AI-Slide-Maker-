@@ -140,7 +140,7 @@ export function SlideView({
         backgroundColor: themeConfig.colors.background,
         color: themeConfig.colors.text,
         fontFamily: themeConfig.typography.fontFamily,
-        backgroundImage: themeConfig.backgroundImage,
+        backgroundImage: (themeConfig as { backgroundImage?: string }).backgroundImage,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -149,7 +149,7 @@ export function SlideView({
       <div className={`max-w-6xl mx-auto h-full ${getLayoutClasses()}`}>
         {slide.blocks.map((block, index) => (
           <div
-            key={block.id || index}
+            key={index}
             className="w-full"
             style={{
               animationDelay: `${index * 200}ms`,

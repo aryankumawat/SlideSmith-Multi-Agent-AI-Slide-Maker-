@@ -146,19 +146,16 @@ export class PresentationExecutor {
       animation: 'hero',
       blocks: [
         {
-          id: `title_heading_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Heading',
           text: this.plan.title,
           animation: 'slideInFromTop'
         },
         {
-          id: `title_subheading_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Subheading',
           text: this.plan.overview,
           animation: 'fadeIn'
         },
         {
-          id: `title_quote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Quote',
           text: `"Knowledge is power, but enthusiasm pulls the switch."`,
           author: 'Steve Dahl',
@@ -182,19 +179,16 @@ export class PresentationExecutor {
       animation: 'fadeIn',
       blocks: [
         {
-          id: `agenda_heading_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Heading',
           text: 'Presentation Agenda',
           animation: 'slideInFromTop'
         },
         {
-          id: `agenda_subheading_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Subheading',
           text: 'What we\'ll cover in the next few minutes',
           animation: 'fadeIn'
         },
         {
-          id: `agenda_bullets_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Bullets',
           items: [
             'Introduction and Overview',
@@ -207,7 +201,6 @@ export class PresentationExecutor {
           animation: 'staggerIn'
         },
         {
-          id: 'agenda_note',
           type: 'Markdown',
           md: `**Duration:** ${this.plan.estimatedDuration}\n\n**Format:** Interactive presentation with Q&A\n\n**Takeaways:** Actionable insights and practical knowledge`,
           animation: 'slideInFromLeft'
@@ -254,25 +247,21 @@ export class PresentationExecutor {
           animation: 'fadeIn',
           blocks: [
             {
-              id: `heading_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
               type: 'Heading',
               text: `${this.plan.title} - Key Point ${i + 1}`,
               animation: 'slideInFromTop'
             },
             {
-              id: `subheading_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
               type: 'Subheading',
               text: `Essential insights about ${this.plan.title.toLowerCase()}`,
               animation: 'fadeIn'
             },
             {
-              id: `markdown_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
               type: 'Markdown',
               md: `**Focus Area ${i + 1}:** ${this.plan.title}\n\nThis section provides comprehensive coverage of key aspects related to ${this.plan.title.toLowerCase()}, offering actionable insights and practical applications.\n\n**Key Benefits:**\n- Enhanced understanding\n- Practical implementation\n- Strategic insights`,
               animation: 'slideInFromLeft'
             },
             {
-              id: `bullets_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
               type: 'Bullets',
               items: [
                 `• Critical aspect ${i + 1} of ${this.plan.title.toLowerCase()}`,
@@ -284,7 +273,6 @@ export class PresentationExecutor {
               animation: 'staggerIn'
             },
             {
-              id: `quote_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
               type: 'Quote',
               text: `"Understanding ${this.plan.title.toLowerCase()} is essential for achieving success in today's dynamic environment."`,
               author: 'Industry Expert',
@@ -329,19 +317,16 @@ export class PresentationExecutor {
       animation: 'fadeIn',
       blocks: [
         {
-          id: `conclusion_heading_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Heading',
           text: 'Key Takeaways',
           animation: 'slideInFromTop'
         },
         {
-          id: `conclusion_subheading_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Subheading',
           text: 'What we\'ve learned and what\'s next',
           animation: 'fadeIn'
         },
         {
-          id: `conclusion_bullets_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'Bullets',
           items: [
             'Essential concepts and principles covered',
@@ -353,14 +338,12 @@ export class PresentationExecutor {
           animation: 'staggerIn'
         },
         {
-          id: 'conclusion_quote',
           type: 'Quote',
           text: `"The future belongs to those who understand ${this.plan.title.toLowerCase()} and can apply it effectively."`,
           author: 'Industry Leader',
           animation: 'slideInFromBottom'
         },
         {
-          id: 'conclusion_markdown',
           type: 'Markdown',
           md: `## Thank You!\n\n**Questions & Discussion**\n\n**Contact Information:**\n- Email: presenter@company.com\n- LinkedIn: linkedin.com/in/presenter\n\n**Resources:**\n- Additional materials available\n- Follow-up session scheduled\n- Implementation support provided`,
           animation: 'slideInFromLeft'
@@ -378,15 +361,9 @@ export class PresentationExecutor {
     await this.delay(2000);
     
     // Apply theme to the deck
-    this.state.deck.meta = {
-      title: this.plan.title,
-      theme: 'Corporate' as const,
-      subtitle: this.plan.overview,
-      author: 'AI Slide Maker',
-      date: new Date().toISOString().split('T')[0],
-      audience: 'General audience',
-      tone: 'Professional'
-    };
+    this.state.deck.title = this.plan.title;
+    this.state.deck.subtitle = this.plan.overview;
+    this.state.deck.theme = 'Corporate';
     this.addLog('info', 'step_6', 'Applying theme and styling...');
     await this.delay(1000);
     this.addLog('success', 'step_6', 'Theme applied successfully');
@@ -431,7 +408,7 @@ export class PresentationExecutor {
 
   private addLog(type: ExecutionLog['type'], stepId: string, message: string): void {
     const log: ExecutionLog = {
-      id: `log_${Date.now()}_${Math.random()}`,
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       stepId,
       message,

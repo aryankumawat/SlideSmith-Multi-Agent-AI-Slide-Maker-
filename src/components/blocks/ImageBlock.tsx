@@ -41,7 +41,7 @@ export function ImageBlock({
       <div className="space-y-4">
         <div className="relative">
           <img
-            src={block.url}
+            src={block.src}
             alt={block.alt || 'Slide image'}
             className="w-full h-auto rounded-lg shadow-lg"
             style={{

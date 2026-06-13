@@ -209,7 +209,7 @@ export function DeckCanvas({
           {currentSlide && (
             <SlideView
               slide={currentSlide}
-              theme={deck.meta.theme}
+              theme={deck.theme || 'DeepSpace'}
               isEditing={isEditing}
               onBlockEdit={handleBlockEdit}
               onBlockDelete={handleBlockDelete}

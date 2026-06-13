@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GenerateRequestSchema, Deck, Slide } from '@/lib/schema';
+import { GenerateRequestSchema, Deck, Slide, Theme } from '@/lib/schema';
 import { generateOutline } from '@/lib/outline';
 import { generateSlide, createTitleSlide, createAgendaSlide, createConclusionSlide, createThankYouSlide } from '@/lib/slidewriter';
 import { checkRateLimit } from '@/lib/llm';
@@ -30,10 +30,10 @@ export async function POST(request: NextRequest) {
         topic,
         detail: detail || '',
         tone: tone || 'Professional',
-        audience,
-        length,
-        theme,
-        includeLiveWidgets: enableLive,
+        audience: audience || 'General audience',
+        length: length || 10,
+        theme: theme || 'DeepSpace',
+        includeLiveWidgets: enableLive || false,
       });
 
       console.log('Generated plan:', plan);
@@ -140,16 +140,16 @@ export async function POST(request: NextRequest) {
     
     const deck: Deck = {
       id: deckId,
-      meta: {
-        title: outline.title,
-        subtitle: outline.subtitle,
-        author: 'AI Slide Maker',
-        date: new Date().toISOString().split('T')[0],
-        audience: audience || 'General audience',
-        tone: tone || 'Professional',
-        theme: theme || 'DeepSpace',
-      },
+      title: outline.title,
+      subtitle: outline.subtitle,
+      theme: (theme || 'DeepSpace') as Theme,
       slides,
+      metadata: {
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1',
+        author: 'AI Slide Maker',
+      },
     };
 
     return NextResponse.json({ deck });

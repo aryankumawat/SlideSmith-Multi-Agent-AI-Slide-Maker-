@@ -210,6 +210,8 @@ export class ModelRouter {
       input,
       status: 'pending',
       priority: this.calculatePriority(agentType, context),
+      retries: 0,
+      maxRetries: 3,
       createdAt: new Date().toISOString(),
     };
 

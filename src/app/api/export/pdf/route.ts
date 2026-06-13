@@ -111,7 +111,7 @@ async function generatePDF(deck: Deck): Promise<Buffer> {
         }
         
         // Add footer
-        const title = deck.title || deck.meta?.title || '';
+        const title = deck.title || '';
         if (title) {
           doc.fontSize(10).fillColor(theme.textSecondary)
              .text(title, 60, 570, { width: 600, align: 'left' });

@@ -95,7 +95,7 @@ export const SlideBlockSchema = z.discriminatedUnion('type', [
     type: z.literal('Live'),
     widgetSpec: z.object({
       type: z.enum(['LiveChart', 'Ticker', 'Map', 'Countdown', 'Iframe']),
-      config: z.record(z.any()),
+      config: z.record(z.string(), z.any()),
       refreshRate: z.number().optional(),
     }),
     animation: z.string().optional(),
@@ -176,7 +176,7 @@ export type ChartSpec = z.infer<typeof ChartSpecSchema>;
 // Widget Specification Schema
 export const WidgetSpecSchema = z.object({
   type: z.enum(['LiveChart', 'Ticker', 'Map', 'Countdown', 'Iframe']),
-  config: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
   refreshRate: z.number().optional(),
   endpoint: z.string().optional(),
   description: z.string().optional(),
@@ -239,7 +239,7 @@ export const RoutingPolicySchema = z.object({
   rules: z.array(z.object({
     agentType: z.string(),
     modelName: z.string(),
-    conditions: z.record(z.any()).optional(),
+    conditions: z.record(z.string(), z.any()).optional(),
   })),
 });
 
@@ -281,7 +281,7 @@ export type AudienceAdaptation = z.infer<typeof AudienceAdaptationSchema>;
 // Data Visualization Schemas
 export const DataVizInputSchema = z.object({
   analyticalQuestion: z.string(),
-  dataSchema: z.record(z.any()),
+  dataSchema: z.record(z.string(), z.any()),
   sampleData: z.array(z.any()),
   slideContext: z.string(),
 });
@@ -388,9 +388,9 @@ export const AccessibilityInputSchema = z.object({
   deck: z.any(),
   theme: z.string(),
   themeTokens: z.object({
-    colors: z.record(z.string()),
-    typography: z.record(z.any()),
-    spacing: z.record(z.any()),
+    colors: z.record(z.string(), z.string()),
+    typography: z.record(z.string(), z.any()),
+    spacing: z.record(z.string(), z.any()),
   }),
 });
 
@@ -590,7 +590,7 @@ export const GeneratedImageSchema = z.object({
 
 export const ImageGenInputSchema = z.object({
   slides: z.array(z.any()),
-  mediaEnhancements: z.record(z.any()),
+  mediaEnhancements: z.record(z.string(), z.any()),
   themeStyle: z.string(),
   maxImagesPerSection: z.number(),
 });

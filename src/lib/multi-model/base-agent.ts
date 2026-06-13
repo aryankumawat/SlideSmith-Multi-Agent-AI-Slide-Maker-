@@ -84,7 +84,7 @@ export abstract class BaseAgent {
     } catch (error) {
       clearTimeout(timeoutId);
       
-      if (error.name === 'AbortError') {
+      if ((error as Error).name === 'AbortError') {
         throw new Error(`Request timeout after ${this.config.timeout}ms`);
       }
       
@@ -111,7 +111,7 @@ export abstract class BaseAgent {
 
   protected validateInput(input: unknown, schema: unknown): boolean {
     try {
-      schema.parse(input);
+      (schema as { parse: (v: unknown) => void }).parse(input);
       return true;
     } catch (error) {
       console.error(`Input validation failed for ${this.config.name}:`, error);

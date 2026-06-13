@@ -160,10 +160,7 @@ export class DeckStorage {
     const duplicated: Deck = {
       ...original,
       id: `deck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      meta: {
-        ...original.meta,
-        title: `${original.meta.title} (Copy)`,
-      },
+      title: `${original.title} (Copy)`,
     };
 
     await this.saveDeck(duplicated);
@@ -177,9 +174,9 @@ export class DeckStorage {
     return allDecks.filter(stored => {
       const deck = stored.deck;
       return (
-        deck.meta.title.toLowerCase().includes(lowercaseQuery) ||
-        deck.meta.subtitle?.toLowerCase().includes(lowercaseQuery) ||
-        deck.meta.author?.toLowerCase().includes(lowercaseQuery) ||
+        deck.title.toLowerCase().includes(lowercaseQuery) ||
+        deck.subtitle?.toLowerCase().includes(lowercaseQuery) ||
+        deck.metadata?.author?.toLowerCase().includes(lowercaseQuery) ||
         deck.slides.some(slide => 
           slide.blocks.some(block => 
             'text' in block && block.text.toLowerCase().includes(lowercaseQuery)
@@ -207,7 +204,7 @@ export class DeckStorage {
     const averageSlidesPerDeck = totalDecks > 0 ? totalSlides / totalDecks : 0;
     
     const themeCounts = allDecks.reduce((counts, stored) => {
-      const theme = stored.deck.meta.theme;
+      const theme = stored.deck.theme || 'DeepSpace';
       counts[theme] = (counts[theme] || 0) + 1;
       return counts;
     }, {} as Record<string, number>);

@@ -246,7 +246,6 @@ export class AccessibilityLinterAgent extends BaseAgent {
           autoFixable: true,
           priority: ruleSeverity[ruleId] === 'critical' ? 'high' : 'medium',
           effort: 'quick',
-          code: null,
           explanation: `Rule "${ruleId}" violation — this can be corrected automatically.`,
         });
       }
@@ -362,7 +361,7 @@ Return JSON array only:
           autoFixable: fix.autoFixable === true,
           priority: fix.priority || 'medium',
           effort: fix.effort || 'moderate',
-          code: fix.code || null,
+          code: fix.code || undefined,
           explanation: fix.explanation || 'Improves accessibility',
         }));
       }
@@ -376,7 +375,6 @@ Return JSON array only:
       autoFixable: false,
       priority: issue.severity === 'critical' ? 'high' : 'medium',
       effort: 'moderate',
-      code: null,
       explanation: 'Please review and fix manually',
     }));
   }
