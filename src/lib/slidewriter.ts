@@ -65,24 +65,9 @@ Create a JSON slide with this enhanced structure:
       "animation": "staggerIn"
     },
     {
-      "type": "Chart",
-      "chartType": "bar",
-      "title": "Relevant Data Visualization",
-      "data": {
-        "labels": ["Category 1", "Category 2", "Category 3", "Category 4"],
-        "datasets": [{
-          "label": "Values",
-          "data": [65, 78, 45, 82],
-          "backgroundColor": ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4"]
-        }]
-      },
-      "animation": "scaleIn"
-    },
-    {
-      "type": "Quote",
-      "text": "Inspirational or insightful quote related to the topic",
-      "author": "Relevant Expert or Source",
-      "animation": "fadeIn"
+      "type": "Markdown",
+      "md": "**Key Insight:** One concrete finding, statistic, or mechanism that makes this slide memorable. Include a specific number or example.",
+      "animation": "slideInFromLeft"
     }
   ],
   "notes": "Detailed speaker notes with key talking points, statistics, examples, and transition to next slide. Include specific data points and engaging stories to keep audience attention."
@@ -186,14 +171,8 @@ function createEnhancedFallbackBlocks(section: OutlineItem): SlideBlock[] {
     },
     {
       type: 'Bullets',
-      items: section.keyPoints.slice(0, 5).map(point => `• ${point}`),
+      items: section.keyPoints.slice(0, 5).map(point => `${point}`),
       animation: 'staggerIn'
-    },
-    {
-      type: 'Quote',
-      text: `"Understanding ${section.title.toLowerCase()} is crucial for success in today's dynamic environment."`,
-      author: 'Industry Expert',
-      animation: 'fadeIn'
     }
   ];
 }
@@ -255,19 +234,13 @@ export function createAgendaSlide(agenda: OutlineItem[]): Slide {
       },
       {
         type: 'Markdown',
-        md: `**What we'll cover today:**\n\nA comprehensive journey through key topics with interactive elements and actionable insights.`,
+        md: `**What we'll cover today:**\n\nA focused journey through ${agenda.length} key topics with data-driven insights and actionable takeaways.`,
         animation: 'slideInFromLeft'
       },
       {
         type: 'Bullets',
-        items: agenda.map((item, index) => `${index + 1}. **${item.title}** (${item.slideCount} slides) - ${item.objective}`),
+        items: agenda.map((item, index) => `${index + 1}. **${item.title}** (${item.slideCount} slides) — ${item.objective}`),
         animation: 'staggerIn'
-      },
-      {
-        type: 'Quote',
-        text: "A well-structured presentation is the foundation of effective communication.",
-        author: 'Presentation Expert',
-        animation: 'fadeIn'
       }
     ],
     notes: `Walk through the agenda with enthusiasm. Explain the value each section will provide. Set expectations for interactive elements and encourage questions throughout. Mention the estimated duration and any breaks.`,
@@ -293,13 +266,7 @@ export function createConclusionSlide(conclusion: string, references: string[]):
       ...(references.length > 0 ? [
         { type: 'Subheading' as const, text: 'Additional Resources', animation: 'fadeIn' as const },
         { type: 'Bullets' as const, items: references, animation: 'staggerIn' as const }
-      ] : []),
-      {
-        type: 'Quote',
-        text: "The best presentations don't just inform—they inspire action.",
-        author: 'Communication Expert',
-        animation: 'fadeIn'
-      }
+      ] : [])
     ],
     notes: `Summarize the key points with energy. Emphasize the most important takeaways. Provide clear next steps for the audience. Thank them for their attention and open the floor for questions. Be available for follow-up discussions.`,
   };
@@ -323,14 +290,8 @@ export function createThankYouSlide(): Slide {
       },
       {
         type: 'Markdown',
-        md: `**Contact Information:**\n\n*Ready to continue the conversation*\n\n📧 Email: your.email@example.com\n💼 LinkedIn: linkedin.com/in/yourprofile\n🐦 Twitter: @yourhandle`,
+        md: `**Thank you for your time and attention.**\n\nPlease reach out with questions, feedback, or to continue the conversation.`,
         animation: 'slideInFromLeft'
-      },
-      {
-        type: 'Quote',
-        text: "Great presentations create lasting connections and inspire meaningful conversations.",
-        author: 'Presentation Expert',
-        animation: 'fadeIn'
       }
     ],
     notes: `End with enthusiasm and gratitude. Encourage questions and discussion. Provide your contact information clearly. Be approachable and available for follow-up conversations. Thank the audience for their time and attention.`,

@@ -265,6 +265,18 @@ export class LLMClient {
 
 // Factory function to create LLM client
 export function createLLMClient(): LLMClient {
+  // When GROQ_API_KEY is present, use Groq (OpenAI-compatible) regardless of other settings
+  const groqApiKey = process.env.GROQ_API_KEY;
+  if (groqApiKey) {
+    console.log('Using Groq (llama-3.3-70b) for legacy LLM client');
+    return new LLMClient({
+      provider: 'openai',
+      apiKey: groqApiKey,
+      baseUrl: 'https://api.groq.com/openai',
+      model: 'llama-3.3-70b-versatile',
+    });
+  }
+
   const provider = (process.env.LLM_PROVIDER as LLMProvider) || 'demo';
   const apiKey = process.env.LLM_API_KEY || '';
   const baseUrl = process.env.LLM_BASE_URL || (provider === 'openai' ? 'https://api.openai.com' : 'http://localhost:11434');

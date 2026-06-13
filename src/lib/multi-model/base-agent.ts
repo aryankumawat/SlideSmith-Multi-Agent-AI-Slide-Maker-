@@ -44,7 +44,7 @@ export abstract class BaseAgent {
     };
   }
 
-  private async makeLLMRequest(prompt: string, options: Record<string, unknown>): Promise<{ content: string; usage?: unknown }> {
+  private async makeLLMRequest(prompt: string, options: Record<string, unknown>, attempt = 0): Promise<{ content: string; usage?: unknown }> {
     const { provider, apiKey, baseUrl, model, maxTokens, temperature } = this.model!;
 
     const requestBody = {
@@ -73,6 +73,16 @@ export abstract class BaseAgent {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        // Retry on 429 (rate limit) with exponential backoff
+        if (response.status === 429 && attempt < this.config.maxRetries) {
+          const retryAfterHeader = response.headers.get('retry-after');
+          const waitMs = retryAfterHeader
+            ? parseInt(retryAfterHeader, 10) * 1000
+            : Math.pow(2, attempt + 1) * 5000; // 10s, 20s, 40s
+          console.log(`[${this.config.name}] Rate limited (429) — waiting ${waitMs}ms, retry ${attempt + 1}/${this.config.maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          return this.makeLLMRequest(prompt, options, attempt + 1);
+        }
         throw new Error(`LLM API error: ${response.status} ${response.statusText}`);
       }
 
@@ -83,11 +93,11 @@ export abstract class BaseAgent {
       };
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if ((error as Error).name === 'AbortError') {
         throw new Error(`Request timeout after ${this.config.timeout}ms`);
       }
-      
+
       throw error;
     }
   }

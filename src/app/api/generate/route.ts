@@ -114,14 +114,8 @@ export async function POST(request: NextRequest) {
                 },
                 {
                   type: 'Bullets',
-                  items: section.keyPoints.slice(0, 5).map(point => `• ${point}`),
+                  items: section.keyPoints.slice(0, 5).map(point => point),
                   animation: 'staggerIn'
-                },
-                {
-                  type: 'Quote',
-                  text: `"Understanding ${section.title.toLowerCase()} is crucial for success in today's dynamic environment."`,
-                  author: 'Industry Expert',
-                  animation: 'fadeIn'
                 }
               ],
               notes: `Speaker Notes for ${section.title}:\n\nKey Talking Points:\n• ${section.objective}\n• ${section.keyPoints.slice(0, 3).join('\n• ')}\n\nEngagement Tips:\n- Start with a compelling statistic or story\n- Use specific examples and case studies\n- Encourage audience interaction with questions\n- Provide actionable takeaways\n- Connect to real-world applications`,

@@ -154,12 +154,6 @@ export class PresentationExecutor {
           type: 'Subheading',
           text: this.plan.overview,
           animation: 'fadeIn'
-        },
-        {
-          type: 'Quote',
-          text: `"Knowledge is power, but enthusiasm pulls the switch."`,
-          author: 'Steve Dahl',
-          animation: 'slideInFromBottom'
         }
       ],
       notes: `Welcome to ${this.plan.title}. ${this.plan.overview}\n\nOpening Tips:\n- Make eye contact with the audience\n- Smile and show enthusiasm\n- Set the tone for the presentation\n- Establish credibility and expertise`
@@ -216,22 +210,34 @@ export class PresentationExecutor {
 
   private async executeContentSlidesStep(): Promise<boolean> {
     await this.delay(1000);
-    
+
     try {
-      // Use the rich slide generator to create content-rich slides
-      const { RichSlideGenerator } = await import('./rich-slide-generator');
-      const generator = new RichSlideGenerator();
-      
-      const contentSlides = await generator.generateRichSlides(
-        this.plan.title,
-        this.plan.overview,
-        'DeepSpace'
-      );
-      
+      // Call the server-side API so Groq/Ollama env vars are available
+      this.addLog('info', 'step_4', 'Generating content slides via AI…');
+      const response = await fetch('/api/generate-rich-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: this.plan.title,
+          detail: this.plan.overview,
+          theme: 'DeepSpace',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
+      }
+
+      const { slides: contentSlides } = await response.json();
+
+      if (!Array.isArray(contentSlides) || contentSlides.length === 0) {
+        throw new Error('No slides returned from API');
+      }
+
       // Update state with generated content slides
       this.state.deck.slides = [...(this.state.deck.slides || []), ...contentSlides];
       this.addLog('success', 'step_4', `Generated ${contentSlides.length} rich content slides with detailed information`);
-      
+
       return true;
     } catch (error) {
       console.error('Error generating rich slides:', error);
@@ -264,19 +270,13 @@ export class PresentationExecutor {
             {
               type: 'Bullets',
               items: [
-                `• Critical aspect ${i + 1} of ${this.plan.title.toLowerCase()}`,
-                `• Implementation strategies and best practices`,
-                `• Real-world applications and case studies`,
-                `• Future trends and opportunities`,
-                `• Actionable recommendations for success`
+                `Critical aspect ${i + 1} of ${this.plan.title.toLowerCase()}`,
+                `Implementation strategies and best practices`,
+                `Real-world applications and case studies`,
+                `Future trends and opportunities`,
+                `Actionable recommendations for success`
               ],
               animation: 'staggerIn'
-            },
-            {
-              type: 'Quote',
-              text: `"Understanding ${this.plan.title.toLowerCase()} is essential for achieving success in today's dynamic environment."`,
-              author: 'Industry Expert',
-              animation: 'fadeIn'
             }
           ],
           notes: `Speaker Notes for ${this.plan.title} - Key Point ${i + 1}:\n\nKey Talking Points:\n• Essential insights about ${this.plan.title.toLowerCase()}\n• Implementation strategies and best practices\n• Real-world applications and case studies\n\nEngagement Tips:\n- Start with a compelling statistic or story\n- Use specific examples and case studies\n- Encourage audience interaction with questions\n- Provide actionable takeaways\n- Connect to real-world applications`
@@ -332,20 +332,14 @@ export class PresentationExecutor {
             'Essential concepts and principles covered',
             'Practical applications and real-world examples',
             'Best practices for implementation',
-            'Future trends and opportunities',
+            'Future trends and opportunities to explore',
             'Actionable next steps for success'
           ],
           animation: 'staggerIn'
         },
         {
-          type: 'Quote',
-          text: `"The future belongs to those who understand ${this.plan.title.toLowerCase()} and can apply it effectively."`,
-          author: 'Industry Leader',
-          animation: 'slideInFromBottom'
-        },
-        {
           type: 'Markdown',
-          md: `## Thank You!\n\n**Questions & Discussion**\n\n**Contact Information:**\n- Email: presenter@company.com\n- LinkedIn: linkedin.com/in/presenter\n\n**Resources:**\n- Additional materials available\n- Follow-up session scheduled\n- Implementation support provided`,
+          md: `**Questions & Discussion**\n\nThank you for your attention. The floor is open for questions and discussion.`,
           animation: 'slideInFromLeft'
         }
       ],
