@@ -98,7 +98,7 @@ Return ONLY the JSON array, no other text.`;
 
   private generateFallbackSlides(topic: string, _detail: string): Slide[] {
     const topicLower = topic.toLowerCase();
-    const isTech = topicLower.includes('ai') || topicLower.includes('technology') || topicLower.includes('digital') || topicLower.includes('software') || topicLower.includes('machine learning') || topicLower.includes('cloud');
+    const isTech = topicLower.includes('ai') || topicLower.includes('artificial intelligence') || topicLower.includes('technology') || topicLower.includes('digital') || topicLower.includes('software') || topicLower.includes('machine learning') || topicLower.includes('cloud') || topicLower.includes('data science') || topicLower.includes('automation');
     const isHealth = topicLower.includes('health') || topicLower.includes('medical') || topicLower.includes('healthcare');
     const isBusiness = topicLower.includes('business') || topicLower.includes('marketing') || topicLower.includes('strategy') || topicLower.includes('management') || topicLower.includes('finance');
 
@@ -354,45 +354,36 @@ Return ONLY the JSON array, no other text.`;
   }
 
   private parseJSONResponse(response: string): any {
-    try {
-      let cleanedResponse = response.trim();
+    let cleaned = response.trim();
 
-      const jsonStart = cleanedResponse.search(/\[/);
-      if (jsonStart > 0) {
-        cleanedResponse = cleanedResponse.substring(jsonStart);
-      }
+    // Strip markdown code fences (```json ... ``` or ``` ... ```)
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
-      let bracketCount = 0;
-      let endIndex = -1;
-      for (let i = 0; i < cleanedResponse.length; i++) {
-        if (cleanedResponse[i] === '[') {
-          bracketCount++;
-        } else if (cleanedResponse[i] === ']') {
-          bracketCount--;
-          if (bracketCount === 0) {
-            endIndex = i;
-            break;
-          }
-        }
-      }
-
-      if (endIndex > 0) {
-        cleanedResponse = cleanedResponse.substring(0, endIndex + 1);
-      }
-
-      cleanedResponse = cleanedResponse
-        .replace(/,\s*}/g, '}')
-        .replace(/,\s*]/g, ']')
-        .replace(/\n/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      return JSON.parse(cleanedResponse);
-    } catch (error) {
-      console.error('Error parsing JSON response:', error);
-      console.error('Response that failed to parse:', response);
-      return this.getGenericFallback('this topic');
+    // Find first '[' (start of array)
+    const arrayStart = cleaned.indexOf('[');
+    if (arrayStart > 0) {
+      cleaned = cleaned.substring(arrayStart);
     }
+
+    // Find the matching closing ']'
+    let depth = 0;
+    let endIndex = -1;
+    for (let i = 0; i < cleaned.length; i++) {
+      if (cleaned[i] === '[') depth++;
+      else if (cleaned[i] === ']') {
+        depth--;
+        if (depth === 0) { endIndex = i; break; }
+      }
+    }
+
+    if (endIndex > 0) {
+      cleaned = cleaned.substring(0, endIndex + 1);
+    }
+
+    // Remove trailing commas before } and ]
+    cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1').trim();
+
+    return JSON.parse(cleaned);
   }
 
   private getGenericFallback(topic: string): any[] {
