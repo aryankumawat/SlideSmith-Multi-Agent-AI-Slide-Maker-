@@ -236,6 +236,27 @@ ollama pull gemma3:4b         # Fast generation (4B parameters)
 - **Phi-4 (14B)**: Complex reasoning, research, structure planning
 - **Gemma3-4B (4B)**: High-throughput content generation, QA tasks
 
+#### Groq (Free Cloud Tier — Recommended for Best Quality)
+
+Groq provides free API access to Llama 3.3 70B with no credit card required.
+Free tier: ~30 requests/minute, 14,400 requests/day.
+
+1. Sign up at **https://console.groq.com** (free)
+2. Create an API key
+3. Add it to `.env.local`:
+
+```env
+GROQ_API_KEY=gsk_...
+```
+
+That's it. When `GROQ_API_KEY` is set, all 17 agents automatically switch to
+Groq models — no other config change needed. Remove the key to go back to
+fully local Ollama.
+
+**Groq models used:**
+- **llama-3.3-70b-versatile** → reasoning agents (researcher, structurer, fact-checker, deduplication, narrative arc)
+- **llama-3.1-8b-instant** → content agents (slidewriter, copy tightener, speaker notes, etc.)
+
 #### OpenAI (Cloud Deployment)
 
    ```env
