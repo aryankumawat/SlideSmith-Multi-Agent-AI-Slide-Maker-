@@ -107,90 +107,100 @@ export const AGENT_MODEL_ASSIGNMENTS: Record<string, string> = {
   'image-generation-dispatcher': 'gemma3-4b'
 };
 
-// Quality-based routing policies
+// ---- Routing policies ----
+// When GROQ_API_KEY is set, Groq models are preferred for their free tier +
+// high quality. When the key is absent, fall back to Ollama equivalents.
+
+const groqHigh = GROQ_API_KEY ? 'groq-llama-3.3-70b' : 'phi4';
+const groqFast = GROQ_API_KEY ? 'groq-llama-3.1-8b' : 'gemma3-4b';
+
 export const QUALITY_POLICY: Record<string, string> = {
-  'researcher': 'phi4',
-  'structurer': 'phi4',
-  'slidewriter': 'phi4',
-  'copy-tightener': 'phi4',
-  'fact-checker': 'phi4',
-  'data-viz-planner': 'phi4',
-  'media-finder': 'phi4',
-  'speaker-notes-generator': 'phi4',
-  'accessibility-linter': 'phi4',
-  'live-widget-planner': 'phi4',
-  'executive-summary': 'phi4',
-  'audience-adapter': 'phi4',
-  'readability-analyzer': 'phi4',
-  'slide-layout-planner': 'phi4',
-  'deduplication': 'phi4',
-  'narrative-arc-auditor': 'phi4',
-  'image-generation-dispatcher': 'gemma3-4b'
+  'researcher':                 groqHigh,
+  'structurer':                 groqHigh,
+  'slidewriter':                groqHigh,
+  'copy-tightener':             groqHigh,
+  'fact-checker':               groqHigh,
+  'data-viz-planner':           groqHigh,
+  'media-finder':               groqHigh,
+  'speaker-notes-generator':    groqHigh,
+  'accessibility-linter':       groqHigh,
+  'live-widget-planner':        groqHigh,
+  'executive-summary':          groqHigh,
+  'audience-adapter':           groqHigh,
+  'readability-analyzer':       groqHigh,
+  'slide-layout-planner':       groqHigh,
+  'deduplication':              groqHigh,
+  'narrative-arc-auditor':      groqHigh,
+  'image-generation-dispatcher': groqFast,
 };
 
 export const SPEED_POLICY: Record<string, string> = {
-  'researcher': 'gemma3-4b',
-  'structurer': 'gemma3-4b',
-  'slidewriter': 'gemma3-4b',
-  'copy-tightener': 'gemma3-4b',
-  'fact-checker': 'gemma3-4b',
-  'data-viz-planner': 'gemma3-4b',
-  'media-finder': 'gemma3-4b',
-  'speaker-notes-generator': 'gemma3-4b',
-  'accessibility-linter': 'gemma3-4b',
-  'live-widget-planner': 'gemma3-4b',
-  'executive-summary': 'gemma3-4b',
-  'audience-adapter': 'gemma3-4b',
-  'readability-analyzer': 'gemma3-4b',
-  'slide-layout-planner': 'gemma3-4b',
-  'deduplication': 'gemma3-4b',
-  'narrative-arc-auditor': 'gemma3-4b',
-  'image-generation-dispatcher': 'gemma3-4b'
+  'researcher':                 groqFast,
+  'structurer':                 groqFast,
+  'slidewriter':                groqFast,
+  'copy-tightener':             groqFast,
+  'fact-checker':               groqFast,
+  'data-viz-planner':           groqFast,
+  'media-finder':               groqFast,
+  'speaker-notes-generator':    groqFast,
+  'accessibility-linter':       groqFast,
+  'live-widget-planner':        groqFast,
+  'executive-summary':          groqFast,
+  'audience-adapter':           groqFast,
+  'readability-analyzer':       groqFast,
+  'slide-layout-planner':       groqFast,
+  'deduplication':              groqFast,
+  'narrative-arc-auditor':      groqFast,
+  'image-generation-dispatcher': groqFast,
 };
 
 export const BALANCED_POLICY: Record<string, string> = {
-  'researcher': 'phi4',           // High quality for research
-  'structurer': 'gemma3-4b',      // Fast for structure (was timing out)
-  'slidewriter': 'gemma3-4b',     // Fast for content generation
-  'copy-tightener': 'gemma3-4b',  // Fast for editing
-  'fact-checker': 'gemma3-4b',    // Fast for fact checking
-  'data-viz-planner': 'gemma3-4b', // Fast for simple tasks
-  'media-finder': 'gemma3-4b',    // Fast for simple tasks
-  'speaker-notes-generator': 'gemma3-4b', // Fast for simple tasks
-  'accessibility-linter': 'gemma3-4b',    // Fast for simple tasks
-  'live-widget-planner': 'gemma3-4b',     // Fast for simple tasks
-  'executive-summary': 'gemma3-4b',       // Fast for simple tasks
-  'audience-adapter': 'gemma3-4b',        // Fast for simple tasks
-  'readability-analyzer': 'gemma3-4b',     // Fast for simple tasks
-  'slide-layout-planner': 'gemma3-4b',    // Fast for layout decisions
-  'deduplication': 'phi4',                 // High quality for cross-deck analysis
-  'narrative-arc-auditor': 'phi4',         // High quality for narrative analysis
-  'image-generation-dispatcher': 'gemma3-4b' // Fast — mainly builds URLs
+  // Reasoning-heavy agents → high-quality model
+  'researcher':                 groqHigh,
+  'structurer':                 groqHigh,
+  'fact-checker':               groqHigh,
+  'deduplication':              groqHigh,
+  'narrative-arc-auditor':      groqHigh,
+  // Content/tool agents → fast model
+  'slidewriter':                groqFast,
+  'copy-tightener':             groqFast,
+  'speaker-notes-generator':    groqFast,
+  'executive-summary':          groqFast,
+  'audience-adapter':           groqFast,
+  'data-viz-planner':           groqFast,
+  'media-finder':               groqFast,
+  'live-widget-planner':        groqFast,
+  'readability-analyzer':       groqFast,
+  'slide-layout-planner':       groqFast,
+  'accessibility-linter':       groqFast,
+  'image-generation-dispatcher': groqFast,
 };
+
+const ALL_MODELS: Record<string, ModelConfig> = { ...OLLAMA_MODELS, ...GROQ_MODELS };
 
 export function getModelForAgent(agentName: string, policy: string = 'balanced'): ModelConfig {
   let modelName: string;
-  
+
   switch (policy) {
     case 'quality':
-      modelName = QUALITY_POLICY[agentName] || 'phi4';
+      modelName = QUALITY_POLICY[agentName] || groqHigh;
       break;
     case 'speed':
-      modelName = SPEED_POLICY[agentName] || 'gemma3-4b';
+      modelName = SPEED_POLICY[agentName] || groqFast;
       break;
     case 'balanced':
     default:
-      modelName = BALANCED_POLICY[agentName] || 'gemma3-4b';
+      modelName = BALANCED_POLICY[agentName] || groqFast;
       break;
   }
-  
-  return OLLAMA_MODELS[modelName] || OLLAMA_MODELS['gemma3-4b'];
+
+  return ALL_MODELS[modelName] || OLLAMA_MODELS['gemma3-4b'];
 }
 
 export function getAllAvailableModels(): ModelConfig[] {
-  return [...Object.values(OLLAMA_MODELS), ...Object.values(GROQ_MODELS)];
+  return Object.values(ALL_MODELS);
 }
 
 export function getModelByName(name: string): ModelConfig | undefined {
-  return OLLAMA_MODELS[name];
+  return ALL_MODELS[name];
 }
