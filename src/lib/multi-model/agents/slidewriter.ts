@@ -441,20 +441,21 @@ Return as JSON:
   private createFallbackSlide(section: OutlineSection, slideNumber: number, totalSlides: number): Slide {
     return {
       id: `slide-${Date.now()}-${slideNumber}`,
-      layout: 'title-content',
+      layout: 'title+bullets' as const,
       blocks: [
         {
-          type: 'Heading',
+          type: 'Heading' as const,
           text: section.title || `Slide ${slideNumber}`,
           level: 1,
         },
         {
-          type: 'Bullets',
+          type: 'Bullets' as const,
           items: section.keyPoints?.slice(0, 3) || ['Key point 1', 'Key point 2', 'Key point 3'],
         },
       ],
       notes: `Discuss ${section.title || 'this topic'} in detail.`,
-      citations: [],
+      cites: [],
+      order: slideNumber,
     };
   }
 
