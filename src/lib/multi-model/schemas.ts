@@ -22,7 +22,7 @@ export type ResearchSnippet = z.infer<typeof ResearchSnippetSchema>;
 // Outline Section Schema
 export const OutlineSectionSchema = z.object({
   id: z.string(),
-  title: z.string().max(8), // ≤ 8 words
+  title: z.string().max(80), // ≤ 8 words (~80 chars)
   goal: z.string(),
   estSlides: z.number().min(1).max(6),
   keyPoints: z.array(z.string()),
@@ -65,7 +65,7 @@ export const SlideBlockSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('Bullets'),
-    items: z.array(z.string().max(12)), // ≤ 12 words per bullet
+    items: z.array(z.string().max(120)), // ≤ 12 words per bullet (~120 chars)
     animation: z.string().optional(),
   }),
   z.object({
