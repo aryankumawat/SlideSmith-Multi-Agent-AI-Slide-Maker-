@@ -218,7 +218,7 @@ export type QualityCheck = z.infer<typeof QualityCheckSchema>;
 // Model Configuration Schema
 export const ModelConfigSchema = z.object({
   name: z.string(),
-  provider: z.enum(['openai', 'ollama', 'anthropic', 'local']),
+  provider: z.enum(['openai', 'ollama', 'anthropic', 'groq', 'local']),
   model: z.string(),
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
