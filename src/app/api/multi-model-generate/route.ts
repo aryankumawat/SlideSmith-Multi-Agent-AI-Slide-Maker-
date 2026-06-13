@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Initialize orchestrator
     const orchestrator = new MultiModelOrchestrator();
     
-    // Generate presentation
+    // Generate presentation — pass all flags into the pipeline directly
     const result = await orchestrator.generatePresentation({
       topic: validatedData.topic,
       audience: validatedData.audience,
@@ -56,30 +56,10 @@ export async function POST(request: NextRequest) {
       urls: validatedData.urls,
       enableLive: validatedData.enableLive,
       policy: validatedData.policy,
+      generateExecutiveSummary: validatedData.generateExecutiveSummary,
+      targetAudience: validatedData.adaptForAudience?.targetAudience,
+      targetDuration: validatedData.adaptForAudience?.targetDuration,
     });
-
-    // Generate executive summary if requested
-    if (validatedData.generateExecutiveSummary && result.deck) {
-      try {
-        result.executiveSummary = await orchestrator.generateExecutiveSummary(result.deck);
-      } catch (error) {
-        console.warn('[Multi-Model API] Executive summary generation failed:', error);
-      }
-    }
-
-    // Adapt for different audience if requested
-    if (validatedData.adaptForAudience && result.deck) {
-      try {
-        const adaptation = await orchestrator.adaptForAudience(
-          result.deck,
-          validatedData.adaptForAudience.targetAudience,
-          validatedData.adaptForAudience.targetDuration
-        );
-        result.audienceAdaptation = adaptation;
-      } catch (error) {
-        console.warn('[Multi-Model API] Audience adaptation failed:', error);
-      }
-    }
 
     // Return the result
     return NextResponse.json({
@@ -96,9 +76,9 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid request data',
-          details: error.errors.map(e => ({
+          details: error.issues.map((e) => ({
             field: e.path.join('.'),
             message: e.message,
           })),
