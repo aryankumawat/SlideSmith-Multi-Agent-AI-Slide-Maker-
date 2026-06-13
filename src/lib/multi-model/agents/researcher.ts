@@ -290,9 +290,10 @@ Return JSON array of strings only: ["subtopic1", "subtopic2", ...]`;
   }
 
   private generateSearchQueries(topic: string, subtopics: string[], audience: string): string[] {
+    const currentYear = new Date().getFullYear();
     const queries = [
       `${topic} overview`,
-      `${topic} trends 2024`,
+      `${topic} trends ${currentYear}`,
       `${topic} best practices`,
     ];
 
