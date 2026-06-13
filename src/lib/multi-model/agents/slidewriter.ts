@@ -6,6 +6,12 @@ import { z } from 'zod';
 // SLIDEWRITER AGENT - CONTENT COMPOSER
 // ============================================================================
 
+export interface LayoutHint {
+  slideIndex: number;
+  layout: string;
+  visualEmphasis: 'text-heavy' | 'visual-heavy' | 'balanced';
+}
+
 export interface SlidewriterInput {
   section: OutlineSection;
   researchSnippets: ResearchSnippet[];
@@ -22,6 +28,7 @@ export interface SlidewriterInput {
     bulletMax: number;
     bulletsPerSlide: number;
   };
+  layoutHints?: LayoutHint[];
 }
 
 export interface SlidewriterOutput {
@@ -61,7 +68,7 @@ export class SlidewriterAgent extends BaseAgent {
       );
 
       // Generate slides for this section
-      const slides = await this.generateSlidesForSection(input, relevantSnippets);
+      const slides = await this.generateSlidesForSection(input, relevantSnippets, input.layoutHints);
 
       // Calculate quality metrics
       const quality = this.calculateQuality(slides, input);
@@ -105,13 +112,13 @@ export class SlidewriterAgent extends BaseAgent {
   }
 
   private async generateSlidesForSection(
-    input: SlidewriterInput, 
-    relevantSnippets: ResearchSnippet[]
+    input: SlidewriterInput,
+    relevantSnippets: ResearchSnippet[],
+    layoutHints?: LayoutHint[]
   ): Promise<Slide[]> {
     const slides: Slide[] = [];
     const { section, context, wordBudgets } = input;
-    
-    // Generate slides based on the section's estimated slide count
+
     for (let i = 0; i < section.estSlides; i++) {
       const slide = await this.generateSingleSlide(
         section,
@@ -119,9 +126,10 @@ export class SlidewriterAgent extends BaseAgent {
         context,
         wordBudgets,
         i + 1,
-        section.estSlides
+        section.estSlides,
+        layoutHints
       );
-      
+
       slides.push(slide);
     }
 
@@ -134,9 +142,11 @@ export class SlidewriterAgent extends BaseAgent {
     context: { topic: string; audience: string; tone: string; theme: string; slideIndex: number; totalSlides: number },
     wordBudgets: { titleMax: number; bulletMax: number; bulletsPerSlide: number },
     slideNumber: number,
-    totalSlides: number
+    totalSlides: number,
+    layoutHints?: LayoutHint[]
   ): Promise<Slide> {
-    const prompt = this.buildSlidePrompt(section, snippets, context, wordBudgets, slideNumber, totalSlides);
+    const hint = layoutHints?.find(h => h.slideIndex === slideNumber);
+    const prompt = this.buildSlidePrompt(section, snippets, context, wordBudgets, slideNumber, totalSlides, hint);
     
     const response = await this.callLLM(prompt);
     
@@ -175,10 +185,25 @@ export class SlidewriterAgent extends BaseAgent {
     context: { topic: string; audience: string; tone: string; theme: string; slideIndex: number; totalSlides: number },
     wordBudgets: { titleMax: number; bulletMax: number; bulletsPerSlide: number },
     slideNumber: number,
-    totalSlides: number
+    totalSlides: number,
+    layoutHint?: LayoutHint
   ): string {
     const snippetTexts = snippets.map(s => `"${s.text}" (confidence: ${s.confidence})`).join('\n');
-    
+
+    const layoutInstructions: Record<string, string> = {
+      'kpi':        'Show 2-4 large statistics or metrics as the centrepiece. Minimal prose.',
+      'timeline':   'Structure content as sequential steps, milestones, or a chronological list.',
+      'comparison': 'Frame content as an explicit A vs B, before/after, or pros/cons comparison.',
+      'two-column': 'Split content into two parallel columns: text on one side, supporting detail on the other.',
+      'quote':      'Lead with one impactful quote or testimonial. Keep surrounding text minimal.',
+      'diagram':    'Describe a conceptual model, process flow, or architecture in the bullets field for rendering.',
+      'title+bullets': 'Standard heading + 3-6 bullet points.',
+    };
+
+    const assignedLayout = layoutHint?.layout || 'title+bullets';
+    const layoutInstruction = layoutInstructions[assignedLayout] || layoutInstructions['title+bullets'];
+    const emphasis = layoutHint?.visualEmphasis || 'balanced';
+
     return `Create slide ${slideNumber} of ${totalSlides} for section: "${section.title}"
 
 Section goal: ${section.goal}
@@ -193,6 +218,9 @@ Context:
 - Tone: ${context.tone}
 - Theme: ${context.theme}
 
+Layout: ${assignedLayout} — ${layoutInstruction}
+Visual emphasis: ${emphasis}
+
 Word budgets:
 - Title: ≤${wordBudgets.titleMax} words
 - Bullets: ≤${wordBudgets.bulletMax} words each
@@ -200,7 +228,7 @@ Word budgets:
 
 Create a slide with:
 1. A compelling title (≤${wordBudgets.titleMax} words)
-2. 3-${wordBudgets.bulletsPerSlide} bullet points (≤${wordBudgets.bulletMax} words each)
+2. Content matching the layout type above
 3. Optional subheading if needed
 4. Speaker notes (2-3 sentences)
 5. Citations to research snippets (use snippet IDs)
@@ -212,7 +240,7 @@ Return as JSON:
   "bullets": ["bullet1", "bullet2", "bullet3"],
   "notes": "Speaker notes here",
   "citations": ["snippet-id-1", "snippet-id-2"],
-  "layout": "title+bullets"
+  "layout": "${assignedLayout}"
 }`;
   }
 
