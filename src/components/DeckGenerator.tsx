@@ -1,11 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, FileText, AlignLeft, Layers, BookOpen, BarChart3 } from 'lucide-react';
 
 type TextDensity = 'low' | 'medium' | 'text_heavy';
 
@@ -14,215 +9,276 @@ interface DeckGeneratorProps {
   isLoading?: boolean;
 }
 
-const TEXT_DENSITY_OPTIONS: { value: TextDensity; label: string; desc: string; icon: React.ReactNode }[] = [
-  {
-    value: 'low',
-    label: 'Visual Focus',
-    desc: '1–2 impactful bullets per slide, diagram-heavy',
-    icon: <BarChart3 className="w-5 h-5" />,
-  },
-  {
-    value: 'medium',
-    label: 'Balanced',
-    desc: '3–4 bullets per slide, charts + text',
-    icon: <Layers className="w-5 h-5" />,
-  },
-  {
-    value: 'text_heavy',
-    label: 'Text-Heavy',
-    desc: '5–7 detailed bullets, academic depth',
-    icon: <AlignLeft className="w-5 h-5" />,
-  },
+const DENSITY_OPTIONS: { value: TextDensity; label: string; sub: string }[] = [
+  { value: 'low',        label: 'Visual',   sub: '1–2 bullets' },
+  { value: 'medium',     label: 'Balanced', sub: '3–4 bullets' },
+  { value: 'text_heavy', label: 'Dense',    sub: '5–7 bullets' },
 ];
 
+const SELECT_STYLE: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: '#F0EEE8',
+  fontSize: 14,
+  fontWeight: 600,
+  fontFamily: 'var(--font-syne), Syne, sans-serif',
+  cursor: 'pointer',
+  outline: 'none',
+  width: '100%',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+};
+
 export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGeneratorProps) {
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     topic_or_prompt: '',
-    tone: 'academic',
+    tone: 'professional',
     audience: 'general',
     slide_count: 10,
     theme: 'academic',
     text_density: 'medium' as TextDensity,
-    live_widgets: false,
   });
+
+  const set = (field: string, value: any) =>
+    setForm(prev => ({ ...prev, [field]: value }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onGenerate({ mode: 'quick_prompt', ...formData });
+    onGenerate({ mode: 'quick_prompt', ...form });
   };
 
-  const set = (field: string, value: any) =>
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const canSubmit = !isLoading && form.topic_or_prompt.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-4 uppercase tracking-widest">
-            <BookOpen className="w-3.5 h-3.5" />
-            Multi-Agent AI • Powered by Ollama
+    <div style={{
+      minHeight: '100vh',
+      background: '#0D0D0D',
+      color: '#F0EEE8',
+      fontFamily: 'var(--font-syne), Syne, sans-serif',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{
+        borderBottom: '1px solid #1E1E1E',
+        padding: '0 48px',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+          SlideSmith
+        </span>
+        <span style={{ color: '#2A2A2A', fontSize: 16, lineHeight: 1 }}>/</span>
+        <span style={{ fontSize: 11, color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          New Presentation
+        </span>
+      </div>
+
+      {/* Main */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px 24px',
+      }}>
+        <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: 640 }}>
+
+          {/* Headline */}
+          <div style={{ marginBottom: 40 }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.25em',
+              textTransform: 'uppercase', color: '#444', marginBottom: 14,
+            }}>
+              Create
+            </div>
+            <h1 style={{
+              fontSize: 'clamp(26px, 4vw, 38px)',
+              fontWeight: 800, lineHeight: 1.1,
+              letterSpacing: '-0.02em', margin: 0,
+            }}>
+              What's this presentation about?
+            </h1>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-3">
-            Slide<span className="text-blue-600">Smith</span>
-          </h1>
-          <p className="text-slate-500 text-lg max-w-md mx-auto">
-            Describe your topic, set your parameters, and get a professional presentation in minutes.
+
+          {/* Prompt textarea */}
+          <div style={{ marginBottom: 28 }}>
+            <textarea
+              placeholder="Describe your topic in detail. The more specific, the better the output. E.g. 'Climate change impacts on coastal economies — include sea level data, economic projections, and policy options for a government audience.'"
+              value={form.topic_or_prompt}
+              onChange={e => set('topic_or_prompt', e.target.value)}
+              required
+              style={{
+                width: '100%',
+                minHeight: 130,
+                background: '#111111',
+                border: '1px solid #222',
+                borderRadius: 0,
+                color: '#F0EEE8',
+                fontSize: 14,
+                padding: '16px 18px',
+                resize: 'vertical',
+                fontFamily: 'var(--font-syne), Syne, sans-serif',
+                outline: 'none',
+                lineHeight: 1.65,
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#C8FF00'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = '#222'; }}
+            />
+          </div>
+
+          {/* Params row 1: slides + theme */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
+                01 / Slides
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => set('slide_count', Math.max(4, form.slide_count - 1))}
+                  style={{
+                    width: 28, height: 28, background: 'none',
+                    border: '1px solid #2A2A2A', color: '#888',
+                    cursor: 'pointer', fontSize: 16, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'inherit',
+                  }}
+                >−</button>
+                <span style={{
+                  fontSize: 24, fontWeight: 800, minWidth: 40,
+                  textAlign: 'center', fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {form.slide_count}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => set('slide_count', Math.min(30, form.slide_count + 1))}
+                  style={{
+                    width: 28, height: 28, background: 'none',
+                    border: '1px solid #2A2A2A', color: '#888',
+                    cursor: 'pointer', fontSize: 16, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'inherit',
+                  }}
+                >+</button>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
+                02 / Theme
+              </div>
+              <div style={{ position: 'relative' }}>
+                <select value={form.theme} onChange={e => set('theme', e.target.value)} style={SELECT_STYLE}>
+                  <option value="academic"    style={{ background: '#111' }}>Academic (Light)</option>
+                  <option value="corporate"   style={{ background: '#111' }}>Corporate Blue</option>
+                  <option value="deep_space"  style={{ background: '#111' }}>Deep Space</option>
+                  <option value="ultra_violet" style={{ background: '#111' }}>Ultra Violet</option>
+                  <option value="navy_gold"   style={{ background: '#111' }}>Navy & Gold</option>
+                  <option value="minimal"     style={{ background: '#111' }}>Minimal White</option>
+                </select>
+                <span style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: '#444', fontSize: 10, pointerEvents: 'none' }}>▾</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Params row 2: tone + audience */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
+                03 / Tone
+              </div>
+              <div style={{ position: 'relative' }}>
+                <select value={form.tone} onChange={e => set('tone', e.target.value)} style={SELECT_STYLE}>
+                  <option value="professional" style={{ background: '#111' }}>Professional</option>
+                  <option value="academic"     style={{ background: '#111' }}>Academic</option>
+                  <option value="persuasive"   style={{ background: '#111' }}>Persuasive</option>
+                  <option value="casual"       style={{ background: '#111' }}>Casual</option>
+                </select>
+                <span style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: '#444', fontSize: 10, pointerEvents: 'none' }}>▾</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
+                04 / Audience
+              </div>
+              <div style={{ position: 'relative' }}>
+                <select value={form.audience} onChange={e => set('audience', e.target.value)} style={SELECT_STYLE}>
+                  <option value="general"     style={{ background: '#111' }}>General</option>
+                  <option value="executives"  style={{ background: '#111' }}>Executives</option>
+                  <option value="technical"   style={{ background: '#111' }}>Technical</option>
+                  <option value="students"    style={{ background: '#111' }}>Students</option>
+                  <option value="researchers" style={{ background: '#111' }}>Researchers</option>
+                </select>
+                <span style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: '#444', fontSize: 10, pointerEvents: 'none' }}>▾</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Content density */}
+          <div style={{ marginBottom: 32 }}>
+            <div style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
+              textTransform: 'uppercase', color: '#444', marginBottom: 12,
+            }}>
+              05 / Content Density
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {DENSITY_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => set('text_density', opt.value)}
+                  style={{
+                    padding: '14px 12px',
+                    background: form.text_density === opt.value ? '#C8FF00' : '#111',
+                    border: form.text_density === opt.value ? '1px solid #C8FF00' : '1px solid #222',
+                    color: form.text_density === opt.value ? '#0D0D0D' : '#888',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontFamily: 'var(--font-syne), Syne, sans-serif',
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>{opt.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            style={{
+              width: '100%',
+              background: canSubmit ? '#C8FF00' : '#161616',
+              color: canSubmit ? '#0D0D0D' : '#333',
+              border: 'none',
+              padding: '18px 24px',
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              fontFamily: 'var(--font-syne), Syne, sans-serif',
+              transition: 'all 0.12s',
+            }}
+          >
+            {isLoading ? 'Generating…' : 'Generate Presentation →'}
+          </button>
+
+          <p style={{ textAlign: 'center', fontSize: 11, color: '#333', marginTop: 14 }}>
+            Runs on Groq (cloud) or Ollama (local) · No data stored
           </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl text-slate-800 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-500" />
-                Generate Presentation
-              </CardTitle>
-              <CardDescription>Fill in the details below to create your deck</CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-6 pt-4">
-              {/* Prompt */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  What is your presentation about? <span className="text-red-500">*</span>
-                </label>
-                <Textarea
-                  placeholder="e.g., 'The impact of machine learning on drug discovery — include pharmacokinetics data, clinical trial stages, and regulatory pathways for a graduate audience.'"
-                  value={formData.topic_or_prompt}
-                  onChange={e => set('topic_or_prompt', e.target.value)}
-                  className="min-h-[110px] resize-none text-sm border-slate-200 focus:border-blue-400"
-                  required
-                />
-              </div>
-
-              {/* Row: slides + theme */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Number of Slides
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={4}
-                      max={30}
-                      step={1}
-                      value={formData.slide_count}
-                      onChange={e => set('slide_count', parseInt(e.target.value))}
-                      className="flex-1 accent-blue-600"
-                    />
-                    <span className="w-8 text-center font-bold text-blue-700 text-sm">
-                      {formData.slide_count}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">4 – 30 slides</div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Theme</label>
-                  <Select value={formData.theme} onValueChange={v => set('theme', v)}>
-                    <SelectTrigger className="border-slate-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="academic">Academic (Light)</SelectItem>
-                      <SelectItem value="corporate">Corporate Blue</SelectItem>
-                      <SelectItem value="deep_space">Deep Space (Dark)</SelectItem>
-                      <SelectItem value="ultra_violet">Ultra Violet (Dark)</SelectItem>
-                      <SelectItem value="navy_gold">Navy & Gold</SelectItem>
-                      <SelectItem value="minimal">Minimal White</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Row: tone + audience */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Tone</label>
-                  <Select value={formData.tone} onValueChange={v => set('tone', v)}>
-                    <SelectTrigger className="border-slate-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="academic">Academic</SelectItem>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="persuasive">Persuasive</SelectItem>
-                      <SelectItem value="casual">Casual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Audience</label>
-                  <Select value={formData.audience} onValueChange={v => set('audience', v)}>
-                    <SelectTrigger className="border-slate-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="executives">Executives</SelectItem>
-                      <SelectItem value="technical">Technical / Engineering</SelectItem>
-                      <SelectItem value="students">Students / Academic</SelectItem>
-                      <SelectItem value="researchers">Researchers</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Text Density */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  Content Density
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {TEXT_DENSITY_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => set('text_density', opt.value)}
-                      className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                        formData.text_density === opt.value
-                          ? 'border-blue-500 bg-blue-50 shadow-sm'
-                          : 'border-slate-200 hover:border-blue-300 bg-white'
-                      }`}
-                    >
-                      <div className={`mb-1.5 ${formData.text_density === opt.value ? 'text-blue-600' : 'text-slate-400'}`}>
-                        {opt.icon}
-                      </div>
-                      <div className={`text-xs font-semibold ${formData.text_density === opt.value ? 'text-blue-700' : 'text-slate-700'}`}>
-                        {opt.label}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5 leading-tight">{opt.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-base shadow-md"
-                disabled={isLoading || !formData.topic_or_prompt.trim()}
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    Generating — this may take a few minutes…
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5" />
-                    Generate Presentation
-                  </span>
-                )}
-              </Button>
-
-              <p className="text-xs text-slate-400 text-center">
-                Uses Ollama locally • No data leaves your machine
-              </p>
-            </CardContent>
-          </Card>
         </form>
       </div>
     </div>

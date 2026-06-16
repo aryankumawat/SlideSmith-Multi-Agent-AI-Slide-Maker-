@@ -2,160 +2,162 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, Sparkles, Download, Network, Zap, BookOpen, BarChart3, AlignLeft, Layers } from 'lucide-react';
 
-const features = [
-  {
-    icon: <Zap className="h-6 w-6" />,
-    color: 'bg-blue-100 text-blue-600',
-    title: 'Multi-Agent AI Pipeline',
-    desc: '13 specialized agents — researcher, structurer, fact-checker, and more — collaborate to build your deck.',
-  },
-  {
-    icon: <Network className="h-6 w-6" />,
-    color: 'bg-purple-100 text-purple-600',
-    title: 'Interactive Diagrams',
-    desc: 'Auto-generated flowcharts, timelines, comparison tables, cycle diagrams, and hierarchy charts.',
-  },
-  {
-    icon: <BarChart3 className="h-6 w-6" />,
-    color: 'bg-green-100 text-green-600',
-    title: 'Live Charts',
-    desc: 'Interactive bar, line, pie, area charts rendered with real data directly in your slides.',
-  },
-  {
-    icon: <BookOpen className="h-6 w-6" />,
-    color: 'bg-red-100 text-red-600',
-    title: 'Academic & Professional Themes',
-    desc: 'Choose from Academic, Corporate, Navy & Gold, Deep Space, Minimal, and Ultra Violet themes.',
-  },
-  {
-    icon: <AlignLeft className="h-6 w-6" />,
-    color: 'bg-orange-100 text-orange-600',
-    title: 'Text Density Control',
-    desc: 'Visual Focus (1–2 bullets), Balanced (3–4), or Text-Heavy (5–7) — you decide the depth.',
-  },
-  {
-    icon: <Download className="h-6 w-6" />,
-    color: 'bg-indigo-100 text-indigo-600',
-    title: 'PPTX & PDF Export',
-    desc: 'Export native PowerPoint files with editable charts, or high-quality PDFs — all locally processed.',
-  },
+const FEATURES = [
+  { num: '01', title: 'Multi-Agent Pipeline', desc: '13 specialized agents research, structure, and fact-check every slide in sequence.' },
+  { num: '02', title: 'Live Recharts', desc: 'Bar, line, pie, and area charts auto-generated with realistic data, rendered inline.' },
+  { num: '03', title: 'Topic Photography', desc: 'Relevant photos pulled for each slide — no placeholders, no stock-photo clichés.' },
+  { num: '04', title: 'Auto Diagrams', desc: 'Flowcharts, timelines, comparison tables built directly from slide content.' },
+  { num: '05', title: 'Six Themes', desc: 'Academic, Corporate, Deep Space, Ultra Violet, Navy & Gold, Minimal White.' },
+  { num: '06', title: 'PPTX + PDF Export', desc: 'Export native PowerPoint or PDF — processed entirely on your machine, zero cloud.' },
 ];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div style={{
+      minHeight: '100vh',
+      background: '#0D0D0D',
+      color: '#F0EEE8',
+      fontFamily: 'var(--font-syne), Syne, sans-serif',
+    }}>
       {/* Nav */}
-      <header className="container mx-auto px-6 py-5">
-        <nav className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-slate-900">SlideSmith</span>
-          </div>
-          <Link href="/studio-new">
-            <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
-              Open Studio <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </nav>
-      </header>
+      <nav style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 48px', height: 56,
+        borderBottom: '1px solid #1E1E1E',
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+          SlideSmith
+        </span>
+        <Link href="/studio-new" style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 12, color: '#888', textDecoration: 'none',
+          fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase',
+        }}>
+          Open Studio <span style={{ color: '#C8FF00', fontSize: 14 }}>→</span>
+        </Link>
+      </nav>
 
       {/* Hero */}
-      <section className="container mx-auto px-6 py-20 text-center">
-        <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-4 py-2 rounded-full mb-6 uppercase tracking-widest">
-            <BookOpen className="w-3.5 h-3.5" />
-            Powered by Ollama • Runs 100% Locally
-          </div>
-          <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight mb-5 leading-tight">
-            Academic-grade
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-              AI Presentations
-            </span>
-          </h1>
-          <p className="text-xl text-slate-500 mb-8 max-w-xl mx-auto leading-relaxed">
-            Enter a prompt, choose your slide count and content density. SlideSmith&apos;s 13-agent pipeline
-            generates charts, diagrams, and structured slides — all offline with Ollama.
+      <section style={{ padding: '72px 48px 56px' }}>
+        <h1 style={{
+          fontSize: 'clamp(48px, 7.5vw, 104px)',
+          fontWeight: 800,
+          lineHeight: 1.0,
+          letterSpacing: '-0.03em',
+          margin: '0 0 40px',
+          maxWidth: 900,
+        }}>
+          Build decks<br />
+          that actually<br />
+          <span style={{ color: '#C8FF00' }}>say something.</span>
+        </h1>
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 56, flexWrap: 'wrap' }}>
+          <p style={{
+            fontSize: 15,
+            color: '#666',
+            lineHeight: 1.75,
+            maxWidth: 400,
+            margin: 0,
+            borderLeft: '2px solid #C8FF00',
+            paddingLeft: 20,
+          }}>
+            Turn any topic into a structured, chart-rich presentation.
+            Multi-agent AI pipeline. Groq or Ollama. Runs locally.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/studio-new">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 gap-2 px-8 shadow-lg">
-                <Sparkles className="h-5 w-5" />
-                Start Creating
-              </Button>
-            </Link>
-          </div>
+          <Link href="/studio-new" style={{ textDecoration: 'none', flexShrink: 0 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              background: '#C8FF00',
+              color: '#0D0D0D',
+              padding: '14px 28px',
+              fontSize: 12, fontWeight: 800,
+              letterSpacing: '0.15em', textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}>
+              Start Creating →
+            </div>
+          </Link>
         </div>
       </section>
 
-      {/* Content Density Explainer */}
-      <section className="container mx-auto px-6 py-12">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-center text-2xl font-bold text-slate-800 mb-6">Content Density Options</h2>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { icon: <BarChart3 className="w-5 h-5" />, label: 'Visual Focus', sub: '1–2 bullets · diagram-heavy', color: 'border-blue-300 bg-blue-50' },
-              { icon: <Layers className="w-5 h-5" />, label: 'Balanced', sub: '3–4 bullets · charts + text', color: 'border-indigo-300 bg-indigo-50' },
-              { icon: <AlignLeft className="w-5 h-5" />, label: 'Text-Heavy', sub: '5–7 bullets · academic depth', color: 'border-purple-300 bg-purple-50' },
-            ].map(opt => (
-              <div key={opt.label} className={`rounded-xl border-2 p-4 text-center ${opt.color}`}>
-                <div className="flex justify-center mb-2 text-slate-600">{opt.icon}</div>
-                <div className="font-semibold text-slate-800 text-sm">{opt.label}</div>
-                <div className="text-xs text-slate-500 mt-1">{opt.sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Divider */}
+      <div style={{ borderTop: '1px solid #1E1E1E', margin: '0 48px' }} />
 
-      {/* Features */}
-      <section className="container mx-auto px-6 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
-            Everything you need for perfect presentations
-          </h2>
-          <p className="text-lg text-slate-500 max-w-xl mx-auto">
-            Professional-grade tools, academic rigor, and zero cloud dependency.
-          </p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {features.map(f => (
-            <div key={f.title} className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-md transition-shadow">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${f.color}`}>
-                {f.icon}
+      {/* Feature grid */}
+      <section style={{ padding: '0 48px 56px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', maxWidth: 960 }}>
+          {FEATURES.map((f, i) => (
+            <div key={f.num} style={{
+              padding: '32px 0',
+              borderTop: '1px solid #1E1E1E',
+              borderRight: i % 2 === 0 ? '1px solid #1E1E1E' : 'none',
+              paddingRight: i % 2 === 0 ? 48 : 0,
+              paddingLeft: i % 2 === 1 ? 48 : 0,
+              display: 'flex', gap: 20,
+            }}>
+              <span style={{
+                fontSize: 10, fontWeight: 700, color: '#444',
+                letterSpacing: '0.1em', paddingTop: 3, flexShrink: 0,
+              }}>
+                {f.num}
+              </span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: '#F0EEE8' }}>
+                  {f.title}
+                </div>
+                <div style={{ fontSize: 13, color: '#555', lineHeight: 1.65 }}>
+                  {f.desc}
+                </div>
               </div>
-              <h3 className="font-semibold text-slate-900 mb-2">{f.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="container mx-auto px-6 py-16">
-        <div className="max-w-4xl mx-auto bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-12 text-center text-white shadow-xl">
-          <h2 className="text-3xl font-bold mb-3">Ready to build your deck?</h2>
-          <p className="text-blue-100 mb-7 text-lg">
-            One prompt. Multiple agents. A presentation in minutes — entirely on your machine.
-          </p>
-          <Link href="/studio-new">
-            <Button size="lg" className="bg-white text-blue-700 hover:bg-blue-50 gap-2 font-semibold px-8 shadow-md">
-              <Sparkles className="h-5 w-5" />
-              Open SlideSmith Studio
-            </Button>
-          </Link>
+      {/* Bottom CTA */}
+      <section style={{
+        margin: '0 48px 48px',
+        borderTop: '1px solid #1E1E1E',
+        padding: '48px 0',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 24,
+      }}>
+        <div>
+          <div style={{ fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>
+            Ready to build?
+          </div>
+          <div style={{ fontSize: 13, color: '#555' }}>
+            No account. No cloud. Type a topic, get a deck.
+          </div>
         </div>
+        <Link href="/studio-new" style={{ textDecoration: 'none' }}>
+          <div style={{
+            border: '1px solid #333',
+            color: '#F0EEE8',
+            padding: '14px 28px',
+            fontSize: 12, fontWeight: 700,
+            letterSpacing: '0.15em', textTransform: 'uppercase',
+            cursor: 'pointer',
+          }}>
+            Open Studio →
+          </div>
+        </Link>
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-6 py-8 border-t border-slate-200">
-        <p className="text-center text-sm text-slate-400">
-          &copy; {new Date().getFullYear()} SlideSmith · Built with Next.js, Ollama, Recharts
-        </p>
+      <footer style={{
+        borderTop: '1px solid #1A1A1A',
+        padding: '20px 48px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 11, color: '#333', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+          SlideSmith
+        </span>
+        <span style={{ fontSize: 11, color: '#333' }}>
+          Built with Next.js · Runs locally
+        </span>
       </footer>
     </div>
   );

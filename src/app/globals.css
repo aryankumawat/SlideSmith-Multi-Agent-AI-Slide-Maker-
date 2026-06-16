@@ -217,12 +217,27 @@
 }
 
 @keyframes twinkle {
-  0%, 100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes ss-progress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes ss-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ss-fade-up {
+  animation: ss-fade-up 0.5s ease both;
+}
+
+.ss-progress-bar {
+  animation: ss-progress 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 /* Custom animations for slides */

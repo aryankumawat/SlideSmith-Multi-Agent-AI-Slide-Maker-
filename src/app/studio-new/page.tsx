@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import DeckGenerator from '@/components/DeckGenerator';
 import { SlideCanvas } from '@/components/SlideCanvas';
-import { Button } from '@/components/ui/button';
-import { Download, RefreshCw, Sparkles } from 'lucide-react';
 
 interface Slide {
   layout: string;
@@ -26,6 +24,27 @@ interface Deck {
   slides: Slide[];
 }
 
+const FONT = 'var(--font-syne), Syne, sans-serif';
+const BG = '#0D0D0D';
+const BORDER = '#1E1E1E';
+const TEXT = '#F0EEE8';
+const MUTED = '#555';
+const LIME = '#C8FF00';
+
+const BTN_BASE: React.CSSProperties = {
+  border: `1px solid #2A2A2A`,
+  color: MUTED,
+  background: 'none',
+  padding: '6px 14px',
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  cursor: 'pointer',
+  fontFamily: FONT,
+  transition: 'all 0.12s',
+};
+
 export default function StudioNewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedDeck, setGeneratedDeck] = useState<Deck | null>(null);
@@ -37,7 +56,7 @@ export default function StudioNewPage() {
     setError(null);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 480000); // 8 min
+      const timeoutId = setTimeout(() => controller.abort(), 480000);
 
       const response = await fetch('/api/generate-deck', {
         method: 'POST',
@@ -123,29 +142,56 @@ export default function StudioNewPage() {
     })),
   });
 
-  // ── Loading screen ──
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center"
-        style={{ backgroundColor: '#0F1117' }}>
-        <div className="text-center space-y-6 max-w-md px-6">
-          <div className="relative mx-auto w-20 h-20">
-            <div className="absolute inset-0 rounded-full border-4 border-blue-500/20 animate-pulse" />
-            <div className="absolute inset-0 rounded-full border-t-4 border-blue-500 animate-spin" />
-            <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-blue-400" />
+      <div style={{
+        minHeight: '100vh', background: BG, color: TEXT,
+        fontFamily: FONT,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{ width: '100%', maxWidth: 480, padding: '0 24px', textAlign: 'center' }}>
+          <div style={{
+            fontSize: 10, letterSpacing: '0.25em', textTransform: 'uppercase',
+            color: MUTED, marginBottom: 28,
+          }}>
+            SlideSmith / Generating
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-2">Generating your deck…</h2>
-            <p className="text-white/50 text-sm">
-              Multi-agent AI is researching, structuring, and writing your slides.
-              This takes 2–5 minutes with Ollama.
-            </p>
+          <h2 style={{
+            fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 800,
+            lineHeight: 1.1, letterSpacing: '-0.02em', margin: '0 0 36px',
+          }}>
+            Building your presentation…
+          </h2>
+
+          {/* Progress track */}
+          <div style={{
+            width: '100%', height: 1, background: '#1E1E1E',
+            position: 'relative', overflow: 'hidden', marginBottom: 36,
+          }}>
+            <div className="ss-progress-bar" style={{
+              position: 'absolute', left: 0, top: 0,
+              width: '40%', height: '100%',
+              background: LIME,
+            }} />
           </div>
-          <div className="space-y-2 text-left">
-            {['Researching topic…','Planning slide structure…','Writing slide content…','Generating charts & diagrams…'].map((step, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i*0.4}s` }} />
-                <span className="text-white/50 text-sm">{step}</span>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
+            {[
+              'Researching topic',
+              'Planning slide structure',
+              'Writing slide content',
+              'Generating charts & visuals',
+            ].map((step, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <span style={{
+                  fontSize: 9, color: '#2A2A2A', letterSpacing: '0.1em',
+                  minWidth: 20, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <span style={{ fontSize: 13, color: '#444' }}>{step}</span>
               </div>
             ))}
           </div>
@@ -154,16 +200,21 @@ export default function StudioNewPage() {
     );
   }
 
-  // ── Generator form ──
+  // ── Generator form ───────────────────────────────────────────────────────────
   if (!generatedDeck) {
     return (
       <div>
         {error && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-full px-4">
-            <div className="bg-red-900/90 border border-red-500 rounded-xl p-4 shadow-2xl text-white backdrop-blur-sm">
-              <p className="font-semibold text-sm">Generation Failed</p>
-              <p className="text-sm text-red-200 mt-1">{error}</p>
-            </div>
+          <div style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 50, maxWidth: 520, width: 'calc(100% - 32px)',
+            background: '#1A0808', border: '1px solid #4A1010',
+            padding: '16px 20px', fontFamily: FONT,
+          }}>
+            <p style={{ fontWeight: 700, fontSize: 12, color: '#FF6B6B', marginBottom: 4, letterSpacing: '0.05em' }}>
+              Generation Failed
+            </p>
+            <p style={{ fontSize: 12, color: '#CC5555', margin: 0, lineHeight: 1.5 }}>{error}</p>
           </div>
         )}
         <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
@@ -171,57 +222,77 @@ export default function StudioNewPage() {
     );
   }
 
-  // ── Presentation view ──
+  // ── Presentation view ────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#0F1117' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: BG, fontFamily: FONT }}>
 
       {/* Top bar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-b"
-        style={{ backgroundColor: '#1a1d27', borderColor: '#ffffff15' }}>
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center flex-shrink-0">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="text-white font-bold text-sm">SlideSmith</span>
-          </div>
-          <div className="w-px h-5 bg-white/20" />
-          <p className="text-white/70 text-sm font-medium truncate max-w-xs">
+      <div style={{
+        flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', height: 48,
+        borderBottom: `1px solid ${BORDER}`,
+        background: BG,
+      }}>
+        {/* Left */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: TEXT, flexShrink: 0 }}>
+            SlideSmith
+          </span>
+          <span style={{ color: '#2A2A2A', fontSize: 14 }}>/</span>
+          <span style={{
+            fontSize: 12, color: MUTED,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            maxWidth: 280,
+          }}>
             {strip(generatedDeck.title)}
-          </p>
-          <span className="text-white/30 text-xs flex-shrink-0">
-            {generatedDeck.slides.length} slides · {generatedDeck.theme.replace(/_/g,' ')}
+          </span>
+          <span style={{
+            fontSize: 10, color: '#333', flexShrink: 0,
+            letterSpacing: '0.08em',
+          }}>
+            {generatedDeck.slides.length} slides
           </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {error && (
-            <span className="text-xs text-red-400 max-w-xs truncate">{error}</span>
+            <span style={{ fontSize: 11, color: '#FF6B6B', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {error}
+            </span>
           )}
-          <Button size="sm" variant="ghost"
-            className="text-white/60 hover:text-white hover:bg-white/10 gap-2 text-xs"
-            onClick={() => { setGeneratedDeck(null); setError(null); }}>
-            <RefreshCw className="w-3.5 h-3.5" /> New Deck
-          </Button>
-          <Button size="sm" variant="ghost"
-            className="text-white/60 hover:text-white hover:bg-white/10 gap-2 text-xs"
+          <button
+            style={BTN_BASE}
+            onClick={() => { setGeneratedDeck(null); setError(null); }}
+          >
+            ← New Deck
+          </button>
+          <button
+            style={{ ...BTN_BASE, opacity: exportLoading === 'pdf' ? 0.5 : 1 }}
             onClick={() => handleExport('pdf')}
-            disabled={exportLoading === 'pdf'}>
-            <Download className="w-3.5 h-3.5" />
+            disabled={exportLoading === 'pdf'}
+          >
             {exportLoading === 'pdf' ? 'Exporting…' : 'PDF'}
-          </Button>
-          <Button size="sm"
-            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs font-semibold"
+          </button>
+          <button
+            style={{
+              ...BTN_BASE,
+              background: LIME,
+              border: `1px solid ${LIME}`,
+              color: '#0D0D0D',
+              opacity: exportLoading === 'pptx' ? 0.6 : 1,
+            }}
             onClick={() => handleExport('pptx')}
-            disabled={exportLoading === 'pptx'}>
-            <Download className="w-3.5 h-3.5" />
+            disabled={exportLoading === 'pptx'}
+          >
             {exportLoading === 'pptx' ? 'Exporting…' : 'Export PPTX'}
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Slide canvas (takes remaining height) */}
-      <div className="flex-1 min-h-0">
+      {/* Slide canvas */}
+      <div style={{ flex: 1, minHeight: 0 }}>
         <SlideCanvas deck={generatedDeck} />
       </div>
     </div>
