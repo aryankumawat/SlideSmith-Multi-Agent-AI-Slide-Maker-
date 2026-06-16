@@ -92,6 +92,7 @@ const PALETTE = ['#1A3A5C', '#C0392B', '#2E86AB', '#A23B72', '#F18F01', '#5C6BC0
 
 // ─── Chart data builder ───────────────────────────────────────────────────────
 function buildChartData(spec: any) {
+  // Chart.js format: { labels: [...], datasets: [...] }
   if (spec?.labels && spec?.datasets) {
     const keys = spec.datasets.map((d: any) => d.label || 'Value');
     const data = spec.labels.map((label: string, i: number) => {
@@ -101,15 +102,23 @@ function buildChartData(spec: any) {
     });
     return { data, keys };
   }
+  // Simple format: { data: [{ name, value }, ...] }
+  if (Array.isArray(spec?.data) && spec.data.length > 0) {
+    const sample = spec.data[0];
+    const keys = Object.keys(sample).filter(k => k !== 'name' && typeof sample[k] === 'number');
+    if (keys.length > 0) return { data: spec.data, keys };
+    // If values aren't numbers, map to Value key
+    return { data: spec.data.map((d: any) => ({ name: d.name ?? d.label ?? '', Value: Number(d.value ?? d.Value ?? d.y ?? 0) })), keys: ['Value'] };
+  }
   return { data: [{ name: 'A', Value: 40 }, { name: 'B', Value: 65 }, { name: 'C', Value: 52 }, { name: 'D', Value: 78 }], keys: ['Value'] };
 }
 
 // ─── Inline chart component ───────────────────────────────────────────────────
-function SlideChart({ spec, scale }: { spec: any; scale: number }) {
+function SlideChart({ spec, scale, width = 400, height = 250 }: { spec: any; scale: number; width?: number; height?: number }) {
   const type = (spec?.type || 'bar').toLowerCase();
   const { data, keys } = buildChartData(spec);
   const fontSize = Math.max(8, Math.round(9 * scale));
-  const commonProps = { data, margin: { top: 4, right: 8, left: -16, bottom: 2 } };
+  const commonProps = { data, width, height, margin: { top: 4, right: 8, left: -16, bottom: 2 } };
   const axisProps = { tick: { fontSize }, stroke: '#94a3b8' };
   const tooltipStyle = { fontSize: 10, padding: 4 };
 
@@ -513,6 +522,13 @@ function DataInsightSlide({ slide, theme, slideNum, total, scale }: {
   const pad = Math.round(28 * scale);
   const statRowH = Math.round(80 * scale);
   const gap = Math.round(14 * scale);
+  const chartPad = Math.round(10 * scale);
+  const hasBullet = !!slide.bullets?.[0];
+  const chartTop = headerH + statRowH + (hasBullet ? Math.round(52 * scale) : Math.round(14 * scale));
+  const chartBottom = Math.round(22 * scale);
+  const captionH = slide.chart_spec?.caption ? Math.round(16 * scale) : 4;
+  // Explicit pixel height so ResponsiveContainer resolves correctly
+  const chartInnerH = Math.round(540 * scale) - chartTop - chartBottom - 2 * chartPad - captionH;
 
   const statBlocks: StatBlock[] = slide.stat_blocks?.length
     ? slide.stat_blocks.slice(0, 3)
@@ -530,7 +546,7 @@ function DataInsightSlide({ slide, theme, slideNum, total, scale }: {
       </div>
 
       {/* Bullet insight */}
-      {slide.bullets?.[0] && (
+      {hasBullet && (
         <div style={{
           position: 'absolute',
           top: headerH + statRowH + Math.round(20 * scale),
@@ -541,25 +557,25 @@ function DataInsightSlide({ slide, theme, slideNum, total, scale }: {
           borderRadius: Math.round(6 * scale),
         }}>
           <p style={{ fontSize: Math.round(11 * scale), color: theme.bodyColor, lineHeight: 1.45, margin: 0 }}>
-            <Bold text={slide.bullets[0]} accentColor={theme.accentColor} />
+            <Bold text={slide.bullets![0]} accentColor={theme.accentColor} />
           </p>
         </div>
       )}
 
-      {/* Chart */}
-      {slide.chart_spec && (
+      {/* Chart — explicit pixel height so ResponsiveContainer resolves */}
+      {slide.chart_spec && chartInnerH > 20 && (
         <div style={{
           position: 'absolute',
-          top: headerH + statRowH + (slide.bullets?.[0] ? Math.round(52 * scale) : Math.round(14 * scale)),
-          left: pad, right: pad, bottom: Math.round(22 * scale),
+          top: chartTop, left: pad, right: pad, bottom: chartBottom,
           borderRadius: Math.round(10 * scale),
           background: theme.cardBg, border: `1px solid ${theme.cardBorder}`,
-          padding: Math.round(10 * scale),
+          padding: chartPad,
+          overflow: 'hidden',
         }}>
           {slide.chart_spec?.caption && (
-            <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(3 * scale), fontStyle: 'italic' }}>{slide.chart_spec.caption}</p>
+            <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(3 * scale), fontStyle: 'italic', margin: 0 }}>{slide.chart_spec.caption}</p>
           )}
-          <div style={{ height: `calc(100% - ${slide.chart_spec?.caption ? Math.round(16 * scale) : 4}px)` }}>
+          <div style={{ height: chartInnerH }}>
             <ResponsiveContainer width="100%" height="100%">
               <SlideChart spec={slide.chart_spec} scale={scale} />
             </ResponsiveContainer>
@@ -609,11 +625,11 @@ function SplitSlide({ slide, theme, slideNum, total, scale }: {
           </div>
         )}
         {hasVisual && (
-          <div style={{ flex: bullets.length > 0 ? '0 0 53%' : 1, display: 'flex', flexDirection: 'column', gap: Math.round(10 * scale) }}>
+          <div style={{ flex: bullets.length > 0 ? '0 0 53%' : 1, display: 'flex', flexDirection: 'column', gap: Math.round(10 * scale), minHeight: 0 }}>
             {hasChart && (
-              <div style={{ flex: 1, borderRadius: Math.round(10 * scale), background: theme.cardBg, border: `1px solid ${theme.cardBorder}`, padding: Math.round(10 * scale) }}>
-                {slide.chart_spec?.title && <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(4 * scale), fontWeight: 600 }}>{slide.chart_spec.title}</p>}
-                <div style={{ height: `calc(100% - ${slide.chart_spec?.title ? Math.round(18 * scale) : 4}px)` }}>
+              <div style={{ flex: 1, minHeight: 0, borderRadius: Math.round(10 * scale), background: theme.cardBg, border: `1px solid ${theme.cardBorder}`, padding: Math.round(10 * scale), overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {slide.chart_spec?.title && <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(4 * scale), fontWeight: 600, flexShrink: 0 }}>{slide.chart_spec.title}</p>}
+                <div style={{ flex: 1, minHeight: 0 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <SlideChart spec={slide.chart_spec} scale={scale} />
                   </ResponsiveContainer>
@@ -761,6 +777,11 @@ function ChartSlide({ slide, theme, slideNum, total, scale }: {
   const headerH = Math.round(68 * scale);
   const pad = Math.round(28 * scale);
   const bullets = (slide.bullets || []).slice(0, 2);
+  const chartPad = Math.round(12 * scale);
+  const chartTop = headerH + (bullets.length > 0 ? Math.round(54 * scale) : Math.round(12 * scale));
+  const chartBottom = Math.round(22 * scale);
+  const captionH = slide.chart_spec?.caption ? Math.round(18 * scale) : 4;
+  const chartInnerH = Math.round(540 * scale) - chartTop - chartBottom - 2 * chartPad - captionH;
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: theme.bg, fontFamily: theme.font }}>
@@ -776,16 +797,16 @@ function ChartSlide({ slide, theme, slideNum, total, scale }: {
           ))}
         </div>
       )}
-      {slide.chart_spec && (
+      {slide.chart_spec && chartInnerH > 20 && (
         <div style={{
           position: 'absolute',
-          top: headerH + (bullets.length > 0 ? Math.round(54 * scale) : Math.round(12 * scale)),
-          left: pad, right: pad, bottom: Math.round(22 * scale),
+          top: chartTop, left: pad, right: pad, bottom: chartBottom,
           borderRadius: Math.round(10 * scale), background: theme.cardBg,
-          border: `1px solid ${theme.cardBorder}`, padding: Math.round(12 * scale),
+          border: `1px solid ${theme.cardBorder}`, padding: chartPad,
+          overflow: 'hidden',
         }}>
-          {slide.chart_spec?.caption && <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(4 * scale), fontStyle: 'italic' }}>{slide.chart_spec.caption}</p>}
-          <div style={{ height: `calc(100% - ${slide.chart_spec?.caption ? Math.round(18 * scale) : 4}px)` }}>
+          {slide.chart_spec?.caption && <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(4 * scale), fontStyle: 'italic', margin: 0 }}>{slide.chart_spec.caption}</p>}
+          <div style={{ height: chartInnerH }}>
             <ResponsiveContainer width="100%" height="100%">
               <SlideChart spec={slide.chart_spec} scale={scale} />
             </ResponsiveContainer>
@@ -834,11 +855,11 @@ function BulletsSlide({ slide, theme, slideNum, total, scale }: {
           </div>
         )}
         {hasVisual && (
-          <div style={{ flex: bullets.length > 0 ? '0 0 53%' : 1, display: 'flex', flexDirection: 'column', gap: Math.round(10 * scale) }}>
+          <div style={{ flex: bullets.length > 0 ? '0 0 53%' : 1, display: 'flex', flexDirection: 'column', gap: Math.round(10 * scale), minHeight: 0 }}>
             {hasChart && (
-              <div style={{ flex: 1, borderRadius: Math.round(10 * scale), background: theme.cardBg, border: `1px solid ${theme.cardBorder}`, padding: Math.round(10 * scale) }}>
-                {slide.chart_spec?.title && <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(4 * scale), fontWeight: 600 }}>{slide.chart_spec.title}</p>}
-                <div style={{ height: `calc(100% - ${slide.chart_spec?.title ? Math.round(18 * scale) : 4}px)` }}>
+              <div style={{ flex: 1, minHeight: 0, borderRadius: Math.round(10 * scale), background: theme.cardBg, border: `1px solid ${theme.cardBorder}`, padding: Math.round(10 * scale), overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {slide.chart_spec?.title && <p style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, marginBottom: Math.round(4 * scale), fontWeight: 600, flexShrink: 0 }}>{slide.chart_spec.title}</p>}
+                <div style={{ flex: 1, minHeight: 0 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <SlideChart spec={slide.chart_spec} scale={scale} />
                   </ResponsiveContainer>
