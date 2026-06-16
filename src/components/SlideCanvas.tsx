@@ -22,6 +22,7 @@ interface Slide {
   notes?: string;
   chart_spec?: any;
   diagram_spec?: any;
+  image?: { prompt: string; alt: string; source: string; url?: string };
   citations?: string[];
 }
 
@@ -581,7 +582,8 @@ function SplitSlide({ slide, theme, slideNum, total, scale }: {
   const bullets = slide.bullets || [];
   const hasChart = !!slide.chart_spec;
   const hasDiagram = !!slide.diagram_spec;
-  const hasVisual = hasChart || hasDiagram;
+  const hasImage = !!slide.image?.url;
+  const hasVisual = hasChart || hasDiagram || hasImage;
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: theme.bg, fontFamily: theme.font }}>
@@ -621,6 +623,16 @@ function SplitSlide({ slide, theme, slideNum, total, scale }: {
             {hasDiagram && !hasChart && (
               <div style={{ flex: 1 }}>
                 <SlideDiagram spec={slide.diagram_spec} scale={scale} theme={theme} />
+              </div>
+            )}
+            {hasImage && !hasChart && !hasDiagram && (
+              <div style={{ flex: 1, borderRadius: Math.round(10 * scale), overflow: 'hidden', boxShadow: `0 ${Math.round(4 * scale)}px ${Math.round(16 * scale)}px rgba(0,0,0,0.15)` }}>
+                <img
+                  src={slide.image!.url}
+                  alt={slide.image!.alt || slide.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
               </div>
             )}
           </div>
@@ -795,7 +807,8 @@ function BulletsSlide({ slide, theme, slideNum, total, scale }: {
   const bullets = slide.bullets || [];
   const hasChart = !!slide.chart_spec;
   const hasDiagram = !!slide.diagram_spec;
-  const hasVisual = hasChart || hasDiagram;
+  const hasImage = !!slide.image?.url;
+  const hasVisual = hasChart || hasDiagram || hasImage;
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: theme.bg, fontFamily: theme.font }}>
@@ -835,6 +848,16 @@ function BulletsSlide({ slide, theme, slideNum, total, scale }: {
             {hasDiagram && !hasChart && (
               <div style={{ flex: 1 }}>
                 <SlideDiagram spec={slide.diagram_spec} scale={scale} theme={theme} />
+              </div>
+            )}
+            {hasImage && !hasChart && !hasDiagram && (
+              <div style={{ flex: 1, borderRadius: Math.round(10 * scale), overflow: 'hidden', boxShadow: `0 ${Math.round(4 * scale)}px ${Math.round(16 * scale)}px rgba(0,0,0,0.15)` }}>
+                <img
+                  src={slide.image!.url}
+                  alt={slide.image!.alt || slide.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
               </div>
             )}
           </div>

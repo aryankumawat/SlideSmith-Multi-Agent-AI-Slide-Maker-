@@ -16,7 +16,7 @@ interface Slide {
   notes?: string;
   chart_spec?: any;
   diagram_spec?: any;
-  image?: { prompt: string; alt: string; source: string };
+  image?: { prompt: string; alt: string; source: string; url?: string };
   citations?: string[];
 }
 

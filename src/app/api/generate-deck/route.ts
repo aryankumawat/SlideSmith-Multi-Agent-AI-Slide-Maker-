@@ -46,7 +46,7 @@ export type Slide = {
   notes?: string;
   chart_spec?: ChartSpec | null;
   diagram_spec?: any | null;
-  image?: { prompt: string; alt: string; source: string };
+  image?: { prompt: string; alt: string; source: string; url?: string };
   citations?: string[];
 };
 
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
             notes: draft.notes,
             chart_spec: withChart.chart_spec || null,
             diagram_spec: draft.diagram_spec || null,
-            image: { prompt: visual.prompt, alt: visual.alt, source: 'generated' },
+            image: { prompt: visual.prompt, alt: visual.alt, source: 'generated', url: visual.url },
             citations: draft.citations || []
           });
         } catch (slideError) {

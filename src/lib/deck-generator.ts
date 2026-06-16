@@ -82,7 +82,7 @@ export async function generateOutline(params: {
   }>;
 }> {
   const { slide_count, audience, tone, topic_or_prompt_or_instructions: topic } = params;
-  const chartSlides = Math.max(1, Math.round(slide_count * 0.2));
+  const chartSlides = Math.max(2, Math.round(slide_count * 0.30));
 
   const prompt = `You are creating a ${slide_count}-slide presentation outline on: "${topic}"
 Audience: ${audience}. Tone: ${tone}.
@@ -403,7 +403,12 @@ Rules:
 JSON:`;
 
     case 'split':
-    default:
+    default: {
+      const dataKeywords = ['growth', 'rate', 'percent', 'market', 'statistic', 'trend', 'revenue', 'cost', 'adoption', 'increase', 'decrease', 'rise', 'impact', 'number', 'billion', 'million'];
+      const isDataSlide = dataKeywords.some(kw => title.toLowerCase().includes(kw));
+      const chartHint = isDataSlide
+        ? `"chart_spec": {"type":"bar","title":"${title}","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[35,48,62,75,91]}],"caption":"Trend 2020-2024"},`
+        : `"chart_spec": null,`;
       return `Write content for a presentation slide titled: "${title}"
 
 Return ONLY this JSON:
@@ -418,7 +423,7 @@ Return ONLY this JSON:
   ],
   "stat_blocks": null,
   "cards": null,
-  "chart_spec": null,
+  ${chartHint}
   "diagram_spec": null,
   "notes": "",
   "citations": []
@@ -428,7 +433,9 @@ Rules:
 - Each bullet MUST be about "${title}" with real, specific information
 - Bold the key term in each bullet using **asterisks**
 - Include numbers, percentages, or years where relevant
+- If chart_spec is provided, use realistic trend data specific to "${title}"
 JSON:`;
+    }
   }
 }
 
@@ -552,6 +559,28 @@ export async function parseDocuments(docUrls: string[]): Promise<string> {
   if (!docUrls?.length) return '';
   return `Documents: ${docUrls.map(u => u.split('/').pop()).join(', ')}`;
 }
-export async function generateVisual(_: any): Promise<{ prompt: string; alt: string }> {
-  return { prompt: '', alt: '' };
+
+function extractImageKeywords(title: string): string {
+  const stopWords = new Set([
+    'and', 'the', 'of', 'in', 'to', 'a', 'an', 'for', 'with', 'on', 'at',
+    'by', 'from', 'as', 'is', 'was', 'are', 'were', 'how', 'what', 'why',
+    'when', 'where', 'key', 'top', 'its', 'our', 'their', 'into', 'will',
+    'can', 'do', 'we', 'you', 'it', 'this', 'that', 'vs', 'or', 'but',
+  ]);
+  const words = title
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+  return words.slice(0, 3).join(',') || 'business,professional,technology';
+}
+
+export async function generateVisual(params: { title: string; bullets?: string[]; theme_style: string }): Promise<{ prompt: string; alt: string; url: string }> {
+  const keywords = extractImageKeywords(params.title);
+  const url = `https://source.unsplash.com/featured/800x450?${encodeURIComponent(keywords)}`;
+  return {
+    prompt: `${keywords} photo`,
+    alt: params.title,
+    url,
+  };
 }
