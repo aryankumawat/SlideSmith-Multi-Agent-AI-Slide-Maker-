@@ -80,8 +80,9 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
       {/* Main */}
       <div style={{
         flex: 1,
+        overflowY: 'auto',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         padding: '48px 24px',
       }}>

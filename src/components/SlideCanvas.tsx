@@ -918,6 +918,7 @@ export function SlideCanvas({ deck }: { deck: Deck }) {
   const [current, setCurrent] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   const theme = getTheme(deck.theme);
   const slides = deck.slides;
@@ -963,11 +964,16 @@ export function SlideCanvas({ deck }: { deck: Deck }) {
     <div className="flex h-full min-h-0 overflow-hidden" style={{ backgroundColor: '#0F1117' }}>
 
       {/* Left thumbnail panel */}
-      <div className="flex-shrink-0 w-44 overflow-y-auto py-3 px-2 space-y-2"
-        style={{ backgroundColor: '#1a1d27', borderRight: '1px solid #ffffff15' }}>
-        <p className="text-[10px] text-white/30 font-semibold uppercase tracking-widest px-1 mb-2">
-          {slides.length} Slides
-        </p>
+      <div className="flex-shrink-0 w-48 overflow-y-auto py-3 px-2 space-y-2"
+        style={{ backgroundColor: '#13151f', borderRight: '1px solid #ffffff12' }}>
+        <div className="flex items-center justify-between px-1 mb-3">
+          <p className="text-[9px] text-white/25 font-bold uppercase tracking-widest">
+            Slides
+          </p>
+          <p className="text-[9px] text-white/25 font-bold tabular-nums">
+            {slides.length}
+          </p>
+        </div>
         {slides.map((s, i) => (
           <Thumbnail key={i} slide={s} theme={theme} num={i + 1} total={slides.length}
             active={current === i} onClick={() => setCurrent(i)} sectionNum={sectionNums[i]} />
@@ -986,33 +992,62 @@ export function SlideCanvas({ deck }: { deck: Deck }) {
         </div>
 
         {/* Navigation */}
-        <div className="flex-shrink-0 flex items-center justify-center gap-4 pb-4">
+        <div className="flex-shrink-0 flex items-center justify-center gap-5 pb-4">
           <button onClick={prev} disabled={current === 0}
-            className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-30 hover:bg-white/10"
-            style={{ border: '1px solid #ffffff30', color: '#fff' }}>
+            className="w-9 h-9 flex items-center justify-center transition-all disabled:opacity-25 hover:bg-white/10"
+            style={{ border: '1px solid #ffffff20', color: '#fff', borderRadius: 4 }}>
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <div className="flex gap-1.5">
-            {slides.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)}
-                className="rounded-full transition-all"
-                style={{ width: current === i ? 20 : 6, height: 6, backgroundColor: current === i ? theme.accentColor : '#ffffff30' }} />
-            ))}
-          </div>
+
+          {/* Compact dot strip — max 12 dots, else show counter */}
+          {slides.length <= 12 ? (
+            <div className="flex gap-1.5 items-center">
+              {slides.map((_, i) => (
+                <button key={i} onClick={() => setCurrent(i)}
+                  className="rounded-full transition-all"
+                  style={{
+                    width: current === i ? 18 : 5,
+                    height: 5,
+                    backgroundColor: current === i ? theme.accentColor : '#ffffff25',
+                    border: 'none', cursor: 'pointer', padding: 0,
+                  }} />
+              ))}
+            </div>
+          ) : (
+            <span style={{
+              fontSize: 12, color: '#ffffff50', fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '0.05em', minWidth: 56, textAlign: 'center',
+              fontFamily: 'var(--font-syne), Syne, sans-serif',
+            }}>
+              {current + 1} / {slides.length}
+            </span>
+          )}
+
           <button onClick={next} disabled={current === slides.length - 1}
-            className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-30 hover:bg-white/10"
-            style={{ border: '1px solid #ffffff30', color: '#fff' }}>
+            className="w-9 h-9 flex items-center justify-center transition-all disabled:opacity-25 hover:bg-white/10"
+            style={{ border: '1px solid #ffffff20', color: '#fff', borderRadius: 4 }}>
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Speaker notes */}
+        {/* Speaker notes — collapsible */}
         {slide?.notes && (
           <div className="flex-shrink-0 px-6 pb-3">
-            <div className="rounded-lg p-3" style={{ backgroundColor: '#ffffff08', border: '1px solid #ffffff15' }}>
-              <p className="text-xs font-semibold text-white/40 mb-1 uppercase tracking-wider">Speaker Notes</p>
-              <p className="text-sm text-white/60">{slide.notes}</p>
-            </div>
+            <button
+              onClick={() => setNotesOpen(o => !o)}
+              className="flex items-center gap-2 mb-1.5 w-full text-left"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">
+                Speaker Notes
+              </span>
+              <span className="text-[10px] text-white/20">{notesOpen ? '▲' : '▼'}</span>
+            </button>
+            {notesOpen && (
+              <div className="rounded-lg p-3" style={{ backgroundColor: '#ffffff08', border: '1px solid #ffffff15' }}>
+                <p className="text-sm text-white/60 leading-relaxed">{slide.notes}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
