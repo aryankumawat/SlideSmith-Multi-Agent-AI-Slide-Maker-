@@ -45,8 +45,29 @@ const BTN_BASE: React.CSSProperties = {
   transition: 'all 0.12s',
 };
 
+interface LoadingState {
+  progress: number;
+  message: string;
+  deckTitle: string;
+  slideTopics: string[];
+  completedSlides: number;
+  totalSlides: number;
+  currentTitle: string;
+}
+
+const LOADING_INIT: LoadingState = {
+  progress: 0,
+  message: 'Starting…',
+  deckTitle: '',
+  slideTopics: [],
+  completedSlides: 0,
+  totalSlides: 0,
+  currentTitle: '',
+};
+
 export default function StudioNewPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState<LoadingState>(LOADING_INIT);
   const [generatedDeck, setGeneratedDeck] = useState<Deck | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
@@ -54,9 +75,11 @@ export default function StudioNewPage() {
   const handleGenerate = async (data: any) => {
     setIsLoading(true);
     setError(null);
+    setLoadingState(LOADING_INIT);
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 480000);
+      const timeoutId = setTimeout(() => controller.abort(), 600000);
 
       const response = await fetch('/api/generate-deck', {
         method: 'POST',
@@ -66,13 +89,57 @@ export default function StudioNewPage() {
       });
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         const err = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(err.error || err.details || `HTTP ${response.status}`);
+        throw new Error(err.error || `HTTP ${response.status}`);
       }
-      const result = await response.json();
-      if (!result.deck) throw new Error('Invalid response: deck not found');
-      setGeneratedDeck(result.deck);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue;
+          let event: any;
+          try { event = JSON.parse(part.slice(6)); } catch { continue; }
+
+          if (event.type === 'planning') {
+            setLoadingState(s => ({ ...s, message: event.message, progress: event.progress }));
+          } else if (event.type === 'outline') {
+            setLoadingState(s => ({
+              ...s,
+              deckTitle: event.title,
+              slideTopics: event.slideTopics,
+              totalSlides: event.totalSlides,
+              progress: event.progress,
+              message: 'Writing slides…',
+            }));
+          } else if (event.type === 'slide') {
+            setLoadingState(s => ({
+              ...s,
+              completedSlides: event.index,
+              currentTitle: event.title,
+              totalSlides: event.totalSlides,
+              progress: event.progress,
+              message: `Slide ${event.index} of ${event.totalSlides}`,
+            }));
+          } else if (event.type === 'complete') {
+            setGeneratedDeck(event.deck);
+            setIsLoading(false);
+            return;
+          } else if (event.type === 'error') {
+            throw new Error(event.message);
+          }
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error
         ? (err.name === 'AbortError' ? 'Request timed out — is Ollama running? (ollama serve)' : err.message)
@@ -144,56 +211,173 @@ export default function StudioNewPage() {
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (isLoading) {
+    const { progress, deckTitle, slideTopics, completedSlides, totalSlides, currentTitle, message } = loadingState;
+    const hasOutline = slideTopics.length > 0;
+
     return (
       <div style={{
-        minHeight: '100vh', background: BG, color: TEXT,
-        fontFamily: FONT,
+        minHeight: '100vh', background: BG, color: TEXT, fontFamily: FONT,
         display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ width: '100%', maxWidth: 480, padding: '0 24px', textAlign: 'center' }}>
-          <div style={{
-            fontSize: 10, letterSpacing: '0.25em', textTransform: 'uppercase',
-            color: MUTED, marginBottom: 28,
-          }}>
-            SlideSmith / Generating
-          </div>
-          <h2 style={{
-            fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 800,
-            lineHeight: 1.1, letterSpacing: '-0.02em', margin: '0 0 36px',
-          }}>
-            Building your presentation…
-          </h2>
+        {/* Top bar */}
+        <div style={{
+          borderBottom: `1px solid ${BORDER}`, padding: '0 48px', height: 48,
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            SlideSmith
+          </span>
+          <span style={{ color: '#2A2A2A', fontSize: 14 }}>/</span>
+          <span style={{ fontSize: 11, color: MUTED, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            Generating
+          </span>
+        </div>
 
-          {/* Progress track */}
+        {/* Content */}
+        <div style={{
+          flex: 1, display: 'flex', gap: 0,
+          overflow: 'hidden',
+        }}>
+          {/* Left: progress info */}
           <div style={{
-            width: '100%', height: 1, background: '#1E1E1E',
-            position: 'relative', overflow: 'hidden', marginBottom: 36,
+            flex: '0 0 400px', padding: '56px 48px', display: 'flex',
+            flexDirection: 'column', borderRight: `1px solid ${BORDER}`,
+            overflowY: 'auto',
           }}>
-            <div className="ss-progress-bar" style={{
-              position: 'absolute', left: 0, top: 0,
-              width: '40%', height: '100%',
-              background: LIME,
-            }} />
-          </div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#333', marginBottom: 20 }}>
+              Building your deck
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
-            {[
-              'Researching topic',
-              'Planning slide structure',
-              'Writing slide content',
-              'Generating charts & visuals',
-            ].map((step, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {deckTitle ? (
+              <h2 style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em', margin: '0 0 32px', color: TEXT }}>
+                {deckTitle}
+              </h2>
+            ) : (
+              <h2 style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em', margin: '0 0 32px', color: '#2A2A2A' }}>
+                Planning structure…
+              </h2>
+            )}
+
+            {/* Progress bar */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                <span style={{ fontSize: 11, color: MUTED }}>{message}</span>
                 <span style={{
-                  fontSize: 9, color: '#2A2A2A', letterSpacing: '0.1em',
-                  minWidth: 20, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                  fontSize: 22, fontWeight: 800, color: progress > 0 ? LIME : '#222',
+                  fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em',
+                  transition: 'color 0.3s',
                 }}>
-                  {String(i + 1).padStart(2, '0')}
+                  {progress}%
                 </span>
-                <span style={{ fontSize: 13, color: '#444' }}>{step}</span>
               </div>
-            ))}
+              <div style={{ width: '100%', height: 2, background: '#1A1A1A', position: 'relative', overflow: 'hidden' }}>
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, height: '100%',
+                  width: `${progress}%`,
+                  background: LIME,
+                  transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                }} />
+              </div>
+            </div>
+
+            {hasOutline && (
+              <div style={{ marginTop: 8, fontSize: 11, color: '#333' }}>
+                {completedSlides} / {totalSlides} slides written
+              </div>
+            )}
+
+            {/* Phase indicators */}
+            <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { label: 'Plan structure', done: hasOutline || progress >= 10 },
+                { label: 'Write slides', done: completedSlides === totalSlides && totalSlides > 0 },
+                { label: 'Generate visuals', done: progress >= 95 },
+              ].map((phase, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                    background: phase.done ? LIME : '#2A2A2A',
+                    boxShadow: phase.done ? `0 0 6px ${LIME}` : 'none',
+                    transition: 'all 0.3s',
+                  }} />
+                  <span style={{ fontSize: 12, color: phase.done ? '#888' : '#333', transition: 'color 0.3s' }}>
+                    {phase.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: slide list */}
+          <div style={{ flex: 1, padding: '56px 48px', overflowY: 'auto' }}>
+            {!hasOutline ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} style={{
+                    height: 20, background: '#111', borderRadius: 2,
+                    width: `${60 + (i % 3) * 15}%`,
+                    opacity: 0.4 + (i * 0.05),
+                  }} />
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
+                  textTransform: 'uppercase', color: '#333', marginBottom: 20,
+                }}>
+                  Slides · {totalSlides} total
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {slideTopics.map((title, i) => {
+                    const slideNum = i + 1;
+                    const isDone = slideNum <= completedSlides;
+                    const isCurrent = slideNum === completedSlides + 1;
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '10px 0',
+                        borderBottom: `1px solid #111`,
+                        transition: 'opacity 0.3s',
+                      }}>
+                        {/* Status indicator */}
+                        <div style={{ width: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                          {isDone ? (
+                            <span style={{ fontSize: 11, color: LIME, fontWeight: 700 }}>✓</span>
+                          ) : isCurrent ? (
+                            <span style={{ fontSize: 11, color: TEXT, fontWeight: 700 }}>→</span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: '#2A2A2A', fontVariantNumeric: 'tabular-nums' }}>
+                              {String(slideNum).padStart(2, '0')}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Title */}
+                        <span style={{
+                          fontSize: 13,
+                          fontWeight: isCurrent ? 700 : 400,
+                          color: isDone ? '#444' : isCurrent ? TEXT : '#2A2A2A',
+                          transition: 'color 0.3s',
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {title}
+                        </span>
+
+                        {isCurrent && (
+                          <span style={{ fontSize: 9, color: LIME, letterSpacing: '0.1em', textTransform: 'uppercase', flexShrink: 0 }}>
+                            writing
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

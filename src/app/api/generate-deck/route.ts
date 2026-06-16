@@ -130,198 +130,173 @@ const themes: Record<string, { bg: string; surface: string; primary: string; acc
 };
 
 export async function POST(request: NextRequest) {
+  const encoder = new TextEncoder();
+
+  let body: any;
+  let validatedData: z.infer<typeof GenerateDeckRequestSchema>;
+
   try {
-    const body = await request.json();
-    const validatedData = GenerateDeckRequestSchema.parse(body);
-    
-    console.log('[Generate Deck API] Starting generation with mode:', validatedData.mode);
-    
-    // Normalize metadata
-    const meta = {
-      slide_count: validatedData.slide_count,
-      audience: validatedData.audience,
-      tone: validatedData.tone,
-      theme: validatedData.theme,
-      text_density: validatedData.text_density,
-      live_widgets: validatedData.live_widgets
-    };
-    
-    // Process documents if in doc_to_deck mode
-    let docSummary = '';
-    if (validatedData.mode === 'doc_to_deck' && validatedData.assets?.doc_urls) {
-      docSummary = await parseDocuments(validatedData.assets.doc_urls);
-    }
-    
-    // Generate outline with timeout
-    console.log('[Generate Deck API] Generating outline...');
-    const outline = await Promise.race([
-      generateOutline({
-        slide_count: meta.slide_count,
-        audience: meta.audience,
-        tone: meta.tone,
-        topic_or_prompt_or_instructions: validatedData.topic_or_prompt || validatedData.instructions || '',
-        doc_summary_or_empty: docSummary
-      }),
-      new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Outline generation timed out after 60 seconds')), 60000)
-      )
-    ]);
-    
-    console.log('[Generate Deck API] Outline generated, creating slides...');
-    
-    // Validate exact slide count from outline
-    const totalSlidesInOutline = outline.sections.reduce((sum, section) => sum + section.slides.length, 0);
-    if (totalSlidesInOutline !== meta.slide_count) {
-      console.warn(`[Generate Deck API] Outline has ${totalSlidesInOutline} slides, but need exactly ${meta.slide_count}. Adjusting...`);
-      
-      // Adjust outline to match exact count
-      if (totalSlidesInOutline < meta.slide_count) {
-        // Add slides to last section
-        const lastSection = outline.sections[outline.sections.length - 1];
-        const needed = meta.slide_count - totalSlidesInOutline;
-        for (let i = 0; i < needed; i++) {
-          lastSection.slides.push({
-            title: `Additional Key Point ${i + 1}`,
-            layout: 'title_bullets',
-            section: lastSection.name
-          });
-        }
-      } else if (totalSlidesInOutline > meta.slide_count) {
-        // Remove slides from last section
-        const lastSection = outline.sections[outline.sections.length - 1];
-        const toRemove = totalSlidesInOutline - meta.slide_count;
-        lastSection.slides = lastSection.slides.slice(0, lastSection.slides.length - toRemove);
-      }
-    }
-    
-    // Generate slides with progress logging
-    const slides: Slide[] = [];
-    const totalSlides = outline.sections.reduce((sum, section) => sum + section.slides.length, 0);
-    console.log(`[Generate Deck API] Generating exactly ${totalSlides} slides (requested: ${meta.slide_count})`);
-    let currentSlide = 0;
-    
-    for (const section of outline.sections) {
-      for (const slot of section.slides) {
-        currentSlide++;
-        console.log(`[Generate Deck API] Generating slide ${currentSlide}/${totalSlides}: ${slot.title}`);
-        
-        try {
-          const perSlideFacts = docSummary ? harvestFactsForSlide(docSummary, slot.title) : '';
-          const draft = await Promise.race([
-            generateSlide({
-              slide_context: slot,
-              per_slide_extracted_text_or_empty: perSlideFacts,
-              text_density: meta.text_density
-            }),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error(`Slide generation timed out for: ${slot.title}`)), 90000)
-            )
-          ]);
-          
-          let withChart = draft;
-          if (!draft.chart_spec && tableMatchesTitle(docSummary, slot.title)) {
-            withChart = attachChartSpec(draft, tableForTitle(docSummary, slot.title));
-          }
-          
-          const themeConfig = themes[meta.theme] || themes['academic'];
-          const visual = await Promise.race([
-            generateVisual({
-              title: draft.title,
-              bullets: draft.bullets,
-              theme_style: themeConfig.image_style
-            }),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('Visual generation timed out')), 10000)
-            )
-          ]);
-          
-          slides.push({
-            layout: slot.layout as Slide['layout'],
-            title: draft.title,
-            subtitle: draft.subtitle,
-            bullets: draft.bullets,
-            stat_blocks: draft.stat_blocks,
-            cards: draft.cards,
-            notes: draft.notes,
-            chart_spec: withChart.chart_spec || null,
-            diagram_spec: draft.diagram_spec || null,
-            image: { prompt: visual.prompt, alt: visual.alt, source: 'generated', url: visual.url },
-            citations: draft.citations || []
-          });
-        } catch (slideError) {
-          console.error(`[Generate Deck API] Error generating slide ${currentSlide}:`, slideError);
-          // Continue with fallback slide instead of failing completely
-          slides.push({
-            layout: slot.layout as Slide['layout'],
-            title: slot.title,
-            bullets: ['Content generation in progress...'],
-            notes: 'This slide content is being generated.',
-            chart_spec: null,
-            image: { prompt: `Visual for ${slot.title}`, alt: slot.title, source: 'generated' },
-            citations: []
-          });
-        }
-      }
-    }
-    
-    const deck: Deck = {
-      title: outline.title,
-      theme: meta.theme,
-      slides
-    };
-    
-    // Generate export URLs (placeholder for now)
-    const exports = {
-      pptx_url: `export://deck-${Date.now()}.pptx`,
-      pdf_url: `export://deck-${Date.now()}.pdf`,
-      json_url: `export://deck-${Date.now()}.json`
-    };
-    
-    const response: GenerateDeckResponse = {
-      deck,
-      exports
-    };
-    
-    console.log('[Generate Deck API] Generation completed successfully');
-    return NextResponse.json(response);
-    
-  } catch (error) {
-    console.error('[Generate Deck API] Generation failed:', error);
-    
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          error: 'Invalid request data',
-          details: error.issues.map((e: any) => ({
-            field: e.path.join('.'),
-            message: e.message,
-          })),
-        },
-        { status: 400 }
-      );
-    }
-    
-    // Provide more detailed error messages
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const isNetworkError = errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED');
-    const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('aborted');
-    
-    let userFriendlyError = 'Deck generation failed';
-    if (isNetworkError) {
-      userFriendlyError = 'Cannot connect to AI service. Please ensure Ollama is running on http://localhost:11434 or configure your LLM provider in environment variables.';
-    } else if (isTimeoutError) {
-      userFriendlyError = 'Request timed out. The AI service may be slow or unavailable. Please try again.';
-    } else if (errorMessage) {
-      userFriendlyError = `Generation failed: ${errorMessage}`;
-    }
-    
-    return NextResponse.json(
-      { 
-        error: userFriendlyError,
-        details: errorMessage
-      },
-      { status: 500 }
-    );
+    body = await request.json();
+    validatedData = GenerateDeckRequestSchema.parse(body);
+  } catch (parseError) {
+    return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
   }
+
+  const meta = {
+    slide_count: validatedData.slide_count,
+    audience: validatedData.audience,
+    tone: validatedData.tone,
+    theme: validatedData.theme,
+    text_density: validatedData.text_density,
+    live_widgets: validatedData.live_widgets,
+  };
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (data: object) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {}
+      };
+
+      try {
+        send({ type: 'planning', message: 'Planning your presentation…', progress: 3 });
+
+        let docSummary = '';
+        if (validatedData.mode === 'doc_to_deck' && validatedData.assets?.doc_urls) {
+          docSummary = await parseDocuments(validatedData.assets.doc_urls);
+        }
+
+        const outline = await Promise.race([
+          generateOutline({
+            slide_count: meta.slide_count,
+            audience: meta.audience,
+            tone: meta.tone,
+            topic_or_prompt_or_instructions: validatedData.topic_or_prompt || validatedData.instructions || '',
+            doc_summary_or_empty: docSummary,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Outline generation timed out after 60 seconds')), 60000)
+          ),
+        ]);
+
+        // Normalise slide count
+        const totalSlidesInOutline = outline.sections.reduce((s, sec) => s + sec.slides.length, 0);
+        if (totalSlidesInOutline < meta.slide_count) {
+          const last = outline.sections[outline.sections.length - 1];
+          for (let i = 0; i < meta.slide_count - totalSlidesInOutline; i++) {
+            last.slides.push({ title: `Key Point ${i + 1}`, layout: 'title_bullets', section: last.name });
+          }
+        } else if (totalSlidesInOutline > meta.slide_count) {
+          const last = outline.sections[outline.sections.length - 1];
+          last.slides = last.slides.slice(0, last.slides.length - (totalSlidesInOutline - meta.slide_count));
+        }
+
+        const totalSlides = outline.sections.reduce((s, sec) => s + sec.slides.length, 0);
+        const slideTopics = outline.sections.flatMap(sec => sec.slides.map(s => s.title));
+
+        send({
+          type: 'outline',
+          title: outline.title,
+          totalSlides,
+          slideTopics,
+          progress: 10,
+        });
+
+        const slides: Slide[] = [];
+        const themeConfig = themes[meta.theme] || themes['academic'];
+
+        for (const section of outline.sections) {
+          for (const slot of section.slides) {
+            const idx = slides.length + 1;
+
+            try {
+              const perSlideFacts = docSummary ? harvestFactsForSlide(docSummary, slot.title) : '';
+              const draft = await Promise.race([
+                generateSlide({
+                  slide_context: slot,
+                  per_slide_extracted_text_or_empty: perSlideFacts,
+                  text_density: meta.text_density,
+                }),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error(`Slide timed out: ${slot.title}`)), 90000)
+                ),
+              ]);
+
+              let withChart = draft;
+              if (!draft.chart_spec && tableMatchesTitle(docSummary, slot.title)) {
+                withChart = attachChartSpec(draft, tableForTitle(docSummary, slot.title));
+              }
+
+              const visual = await Promise.race([
+                generateVisual({ title: draft.title, bullets: draft.bullets, theme_style: themeConfig.image_style }),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('Visual timed out')), 10000)
+                ),
+              ]);
+
+              slides.push({
+                layout: slot.layout as Slide['layout'],
+                title: draft.title,
+                subtitle: draft.subtitle,
+                bullets: draft.bullets,
+                stat_blocks: draft.stat_blocks,
+                cards: draft.cards,
+                notes: draft.notes,
+                chart_spec: withChart.chart_spec || null,
+                diagram_spec: draft.diagram_spec || null,
+                image: { prompt: visual.prompt, alt: visual.alt, source: 'generated', url: visual.url },
+                citations: draft.citations || [],
+              });
+            } catch {
+              slides.push({
+                layout: slot.layout as Slide['layout'],
+                title: slot.title,
+                bullets: ['Content generation in progress…'],
+                notes: '',
+                chart_spec: null,
+                image: { prompt: '', alt: slot.title, source: 'generated' },
+                citations: [],
+              });
+            }
+
+            send({
+              type: 'slide',
+              index: idx,
+              title: slot.title,
+              totalSlides,
+              progress: Math.round(10 + (idx / totalSlides) * 85),
+            });
+          }
+        }
+
+        const deck: Deck = { title: outline.title, theme: meta.theme, slides };
+        send({ type: 'complete', deck, progress: 100 });
+        controller.close();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        const isNetwork = msg.includes('fetch') || msg.includes('ECONNREFUSED') || msg.includes('network');
+        const isTimeout = msg.includes('timeout') || msg.includes('aborted');
+        send({
+          type: 'error',
+          message: isNetwork
+            ? 'Cannot connect to AI service. Make sure Ollama is running (ollama serve).'
+            : isTimeout
+            ? 'Request timed out — the AI service may be slow. Try again.'
+            : `Generation failed: ${msg}`,
+        });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }
 

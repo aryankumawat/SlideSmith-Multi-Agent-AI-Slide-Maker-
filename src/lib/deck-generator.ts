@@ -572,12 +572,24 @@ function extractImageKeywords(title: string): string {
     .replace(/[^\w\s]/g, '')
     .split(/\s+/)
     .filter(w => w.length > 2 && !stopWords.has(w));
-  return words.slice(0, 3).join(',') || 'business,professional,technology';
+  return words.slice(0, 2).join(',') || 'business,technology';
+}
+
+function titleToSeed(title: string): number {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = ((hash << 5) - hash) + title.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % 9999 + 1;
 }
 
 export async function generateVisual(params: { title: string; bullets?: string[]; theme_style: string }): Promise<{ prompt: string; alt: string; url: string }> {
   const keywords = extractImageKeywords(params.title);
-  const url = `https://source.unsplash.com/featured/800x450?${encodeURIComponent(keywords)}`;
+  const seed = titleToSeed(params.title);
+  // LoremFlickr: free, topic-relevant photos from Flickr, no API key needed
+  // ?lock=N ensures same photo is returned every time for the same seed
+  const url = `https://loremflickr.com/800/450/${encodeURIComponent(keywords)}?lock=${seed}`;
   return {
     prompt: `${keywords} photo`,
     alt: params.title,
