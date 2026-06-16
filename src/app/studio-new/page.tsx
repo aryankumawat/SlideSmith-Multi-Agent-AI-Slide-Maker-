@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import DeckGenerator from '@/components/DeckGenerator';
 import { SlideCanvas } from '@/components/SlideCanvas';
 
@@ -24,26 +25,15 @@ interface Deck {
   slides: Slide[];
 }
 
-const FONT = 'var(--font-syne), Syne, sans-serif';
-const BG = '#0D0D0D';
-const BORDER = '#1E1E1E';
-const TEXT = '#F0EEE8';
-const MUTED = '#555';
+const SYNE = 'var(--font-syne), Syne, sans-serif';
+const MONO = 'var(--font-geist-mono), monospace';
 const LIME = '#C8FF00';
+const BG = '#0A0A0A';
+const BORDER = '#161616';
+const TEXT = '#F0EEE8';
+const MUTED = '#404040';
 
-const BTN_BASE: React.CSSProperties = {
-  border: `1px solid #2A2A2A`,
-  color: MUTED,
-  background: 'none',
-  padding: '6px 14px',
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  cursor: 'pointer',
-  fontFamily: FONT,
-  transition: 'all 0.12s',
-};
+const EASE = [0.32, 0.72, 0, 1] as const;
 
 interface LoadingState {
   progress: number;
@@ -142,7 +132,7 @@ export default function StudioNewPage() {
       }
     } catch (err) {
       const msg = err instanceof Error
-        ? (err.name === 'AbortError' ? 'Request timed out — is Ollama running? (ollama serve)' : err.message)
+        ? (err.name === 'AbortError' ? 'Request timed out. Is Ollama running? (ollama serve)' : err.message)
         : 'An unknown error occurred';
       setError(msg);
     } finally {
@@ -209,98 +199,161 @@ export default function StudioNewPage() {
     })),
   });
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading screen ───────────────────────────────────────────────────────────
   if (isLoading) {
-    const { progress, deckTitle, slideTopics, completedSlides, totalSlides, currentTitle, message } = loadingState;
+    const { progress, deckTitle, slideTopics, completedSlides, totalSlides, message } = loadingState;
     const hasOutline = slideTopics.length > 0;
 
     return (
       <div style={{
-        minHeight: '100vh', background: BG, color: TEXT, fontFamily: FONT,
-        display: 'flex', flexDirection: 'column',
+        minHeight: '100dvh',
+        background: BG,
+        color: TEXT,
+        fontFamily: SYNE,
+        display: 'flex',
+        flexDirection: 'column',
       }}>
-        {/* Top bar */}
+        {/* Nav */}
         <div style={{
-          borderBottom: `1px solid ${BORDER}`, padding: '0 48px', height: 48,
-          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+          height: 52,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 40px',
+          borderBottom: `1px solid ${BORDER}`,
+          flexShrink: 0,
         }}>
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
             SlideSmith
           </span>
-          <span style={{ color: '#2A2A2A', fontSize: 14 }}>/</span>
-          <span style={{ fontSize: 11, color: MUTED, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            Generating
+          <span style={{ fontSize: 11, color: MUTED, fontFamily: MONO, letterSpacing: '0.08em' }}>
+            {message}
           </span>
         </div>
 
-        {/* Content */}
-        <div style={{
-          flex: 1, display: 'flex', gap: 0,
-          overflow: 'hidden',
-        }}>
-          {/* Left: progress info */}
+        {/* Body */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+          {/* Left: Big progress */}
           <div style={{
-            flex: '0 0 400px', padding: '56px 48px', display: 'flex',
-            flexDirection: 'column', borderRight: `1px solid ${BORDER}`,
-            overflowY: 'auto',
+            flex: '0 0 420px',
+            padding: '64px 48px',
+            borderRight: `1px solid ${BORDER}`,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
           }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#333', marginBottom: 20 }}>
-              Building your deck
-            </div>
+            <div>
+              {/* Progress number */}
+              <div style={{ marginBottom: 48 }}>
+                <motion.div
+                  key={Math.floor(progress / 5)}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  style={{
+                    fontSize: 'clamp(72px, 10vw, 96px)',
+                    fontWeight: 800,
+                    letterSpacing: '-0.04em',
+                    lineHeight: 1,
+                    color: progress > 0 ? LIME : '#1A1A1A',
+                    fontVariantNumeric: 'tabular-nums',
+                    transition: 'color 0.4s',
+                  }}
+                >
+                  {progress}<span style={{ fontSize: '0.5em', fontWeight: 400, color: '#2A2A2A' }}>%</span>
+                </motion.div>
 
-            {deckTitle ? (
-              <h2 style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em', margin: '0 0 32px', color: TEXT }}>
-                {deckTitle}
-              </h2>
-            ) : (
-              <h2 style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em', margin: '0 0 32px', color: '#2A2A2A' }}>
-                Planning structure…
-              </h2>
-            )}
-
-            {/* Progress bar */}
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: MUTED }}>{message}</span>
-                <span style={{
-                  fontSize: 22, fontWeight: 800, color: progress > 0 ? LIME : '#222',
-                  fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em',
-                  transition: 'color 0.3s',
-                }}>
-                  {progress}%
-                </span>
-              </div>
-              <div style={{ width: '100%', height: 2, background: '#1A1A1A', position: 'relative', overflow: 'hidden' }}>
+                {/* Progress bar */}
                 <div style={{
-                  position: 'absolute', left: 0, top: 0, height: '100%',
-                  width: `${progress}%`,
-                  background: LIME,
-                  transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                }} />
+                  marginTop: 20,
+                  width: '100%',
+                  height: 3,
+                  background: '#141414',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}>
+                  <motion.div
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
+                    style={{
+                      position: 'absolute',
+                      left: 0, top: 0,
+                      height: '100%',
+                      background: LIME,
+                      borderRadius: 2,
+                      boxShadow: `0 0 12px ${LIME}60`,
+                    }}
+                  />
+                </div>
               </div>
+
+              {/* Deck title */}
+              <AnimatePresence mode="wait">
+                {deckTitle ? (
+                  <motion.h2
+                    key="title"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: EASE }}
+                    style={{
+                      fontSize: 'clamp(18px, 2.5vw, 24px)',
+                      fontWeight: 800,
+                      lineHeight: 1.2,
+                      letterSpacing: '-0.02em',
+                      color: TEXT,
+                      margin: 0,
+                    }}
+                  >
+                    {deckTitle}
+                  </motion.h2>
+                ) : (
+                  <motion.p
+                    key="planning"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{ fontSize: 15, color: '#2A2A2A', margin: 0, fontStyle: 'italic' }}
+                  >
+                    Planning structure...
+                  </motion.p>
+                )}
+              </AnimatePresence>
+
+              {hasOutline && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={{ fontSize: 12, color: MUTED, marginTop: 8, fontFamily: MONO }}
+                >
+                  {completedSlides} of {totalSlides} slides written
+                </motion.p>
+              )}
             </div>
 
-            {hasOutline && (
-              <div style={{ marginTop: 8, fontSize: 11, color: '#333' }}>
-                {completedSlides} / {totalSlides} slides written
-              </div>
-            )}
-
-            {/* Phase indicators */}
-            <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Phase steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
                 { label: 'Plan structure', done: hasOutline || progress >= 10 },
                 { label: 'Write slides', done: completedSlides === totalSlides && totalSlides > 0 },
                 { label: 'Generate visuals', done: progress >= 95 },
               ].map((phase, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                    background: phase.done ? LIME : '#2A2A2A',
-                    boxShadow: phase.done ? `0 0 6px ${LIME}` : 'none',
-                    transition: 'all 0.3s',
-                  }} />
-                  <span style={{ fontSize: 12, color: phase.done ? '#888' : '#333', transition: 'color 0.3s' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <motion.div
+                    animate={{
+                      background: phase.done ? LIME : '#1A1A1A',
+                      boxShadow: phase.done ? `0 0 8px ${LIME}80` : 'none',
+                    }}
+                    transition={{ duration: 0.4 }}
+                    style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0 }}
+                  />
+                  <span style={{
+                    fontSize: 13,
+                    color: phase.done ? '#666' : '#2A2A2A',
+                    textDecoration: phase.done ? 'line-through' : 'none',
+                    transition: 'color 0.3s',
+                  }}>
                     {phase.label}
                   </span>
                 </div>
@@ -308,46 +361,77 @@ export default function StudioNewPage() {
             </div>
           </div>
 
-          {/* Right: slide list */}
-          <div style={{ flex: 1, padding: '56px 48px', overflowY: 'auto' }}>
+          {/* Right: Slide list */}
+          <div style={{ flex: 1, padding: '64px 48px', overflowY: 'auto' }}>
             {!hasOutline ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} style={{
-                    height: 20, background: '#111', borderRadius: 2,
-                    width: `${60 + (i % 3) * 15}%`,
-                    opacity: 0.4 + (i * 0.05),
-                  }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ fontSize: 11, color: '#2A2A2A', fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 8 }}>
+                  Generating outline...
+                </p>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0.2, 0.5, 0.2] }}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+                    style={{
+                      height: 16,
+                      background: '#141414',
+                      borderRadius: 3,
+                      width: `${45 + (i % 4) * 12}%`,
+                    }}
+                  />
                 ))}
               </div>
             ) : (
               <div>
-                <div style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
-                  textTransform: 'uppercase', color: '#333', marginBottom: 20,
+                <p style={{
+                  fontSize: 11,
+                  color: MUTED,
+                  fontFamily: MONO,
+                  letterSpacing: '0.08em',
+                  marginBottom: 24,
                 }}>
-                  Slides · {totalSlides} total
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {totalSlides} slides
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {slideTopics.map((title, i) => {
                     const slideNum = i + 1;
                     const isDone = slideNum <= completedSlides;
                     const isCurrent = slideNum === completedSlides + 1;
+
                     return (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: 14,
-                        padding: '10px 0',
-                        borderBottom: `1px solid #111`,
-                        transition: 'opacity 0.3s',
-                      }}>
-                        {/* Status indicator */}
-                        <div style={{ width: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.35, delay: i * 0.04, ease: EASE }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 16,
+                          padding: '11px 0',
+                          borderBottom: `1px solid ${BORDER}`,
+                        }}
+                      >
+                        {/* Status */}
+                        <div style={{ width: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
                           {isDone ? (
-                            <span style={{ fontSize: 11, color: LIME, fontWeight: 700 }}>✓</span>
+                            <span style={{ fontSize: 10, color: LIME, fontWeight: 700 }}>✓</span>
                           ) : isCurrent ? (
-                            <span style={{ fontSize: 11, color: TEXT, fontWeight: 700 }}>→</span>
+                            <motion.span
+                              animate={{ opacity: [1, 0.4, 1] }}
+                              transition={{ duration: 0.9, repeat: Infinity }}
+                              style={{ fontSize: 10, color: TEXT }}
+                            >
+                              →
+                            </motion.span>
                           ) : (
-                            <span style={{ fontSize: 10, color: '#2A2A2A', fontVariantNumeric: 'tabular-nums' }}>
+                            <span style={{
+                              fontSize: 10, color: '#242424',
+                              fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
+                            }}>
                               {String(slideNum).padStart(2, '0')}
                             </span>
                           )}
@@ -356,23 +440,34 @@ export default function StudioNewPage() {
                         {/* Title */}
                         <span style={{
                           fontSize: 13,
-                          fontWeight: isCurrent ? 700 : 400,
-                          color: isDone ? '#444' : isCurrent ? TEXT : '#2A2A2A',
-                          transition: 'color 0.3s',
+                          fontWeight: isCurrent ? 600 : 400,
+                          color: isDone ? '#303030' : isCurrent ? TEXT : '#222',
                           flex: 1,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          transition: 'color 0.3s',
                         }}>
                           {title}
                         </span>
 
                         {isCurrent && (
-                          <span style={{ fontSize: 9, color: LIME, letterSpacing: '0.1em', textTransform: 'uppercase', flexShrink: 0 }}>
+                          <motion.span
+                            animate={{ opacity: [1, 0.5, 1] }}
+                            transition={{ duration: 1.1, repeat: Infinity }}
+                            style={{
+                              fontSize: 9,
+                              color: LIME,
+                              letterSpacing: '0.12em',
+                              textTransform: 'uppercase',
+                              fontFamily: MONO,
+                              flexShrink: 0,
+                            }}
+                          >
                             writing
-                          </span>
+                          </motion.span>
                         )}
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </div>
@@ -384,23 +479,31 @@ export default function StudioNewPage() {
     );
   }
 
-  // ── Generator form ───────────────────────────────────────────────────────────
+  // ── Generator form ────────────────────────────────────────────────────────────
   if (!generatedDeck) {
     return (
       <div>
-        {error && (
-          <div style={{
-            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 50, maxWidth: 520, width: 'calc(100% - 32px)',
-            background: '#1A0808', border: '1px solid #4A1010',
-            padding: '16px 20px', fontFamily: FONT,
-          }}>
-            <p style={{ fontWeight: 700, fontSize: 12, color: '#FF6B6B', marginBottom: 4, letterSpacing: '0.05em' }}>
-              Generation Failed
-            </p>
-            <p style={{ fontSize: 12, color: '#CC5555', margin: 0, lineHeight: 1.5 }}>{error}</p>
-          </div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.3, ease: EASE }}
+              style={{
+                position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 50, maxWidth: 520, width: 'calc(100% - 32px)',
+                background: '#150808', border: '1px solid #3A1010',
+                padding: '14px 18px', fontFamily: SYNE, borderRadius: 8,
+              }}
+            >
+              <p style={{ fontWeight: 700, fontSize: 11, color: '#FF6B6B', marginBottom: 3, letterSpacing: '0.06em' }}>
+                Generation failed
+              </p>
+              <p style={{ fontSize: 12, color: '#AA4444', margin: 0, lineHeight: 1.5 }}>{error}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
       </div>
     );
@@ -408,69 +511,138 @@ export default function StudioNewPage() {
 
   // ── Presentation view ────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: BG, fontFamily: FONT }}>
-
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100dvh',
+        overflow: 'hidden',
+        background: BG,
+        fontFamily: SYNE,
+      }}
+    >
       {/* Top bar */}
       <div style={{
         flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 48,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 20px 0 28px',
+        height: 52,
         borderBottom: `1px solid ${BORDER}`,
-        background: BG,
       }}>
         {/* Left */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: TEXT, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <span style={{
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: TEXT,
+            flexShrink: 0,
+          }}>
             SlideSmith
           </span>
-          <span style={{ color: '#2A2A2A', fontSize: 14 }}>/</span>
+          <span style={{ color: '#242424', fontSize: 12 }}>/</span>
           <span style={{
-            fontSize: 12, color: MUTED,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            maxWidth: 280,
+            fontSize: 12,
+            color: MUTED,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: 320,
           }}>
             {strip(generatedDeck.title)}
           </span>
           <span style={{
-            fontSize: 10, color: '#333', flexShrink: 0,
-            letterSpacing: '0.08em',
+            fontSize: 10,
+            color: '#242424',
+            flexShrink: 0,
+            fontFamily: MONO,
           }}>
             {generatedDeck.slides.length} slides
           </span>
         </div>
 
-        {/* Right */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {/* Right: actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {error && (
-            <span style={{ fontSize: 11, color: '#FF6B6B', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, color: '#FF6B6B', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {error}
             </span>
           )}
+
           <button
-            style={BTN_BASE}
             onClick={() => { setGeneratedDeck(null); setError(null); }}
+            style={{
+              padding: '6px 14px',
+              background: 'none',
+              border: '1px solid #222',
+              borderRadius: 6,
+              color: MUTED,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              fontFamily: SYNE,
+              transition: 'border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#444'; e.currentTarget.style.color = TEXT; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = MUTED; }}
           >
-            ← New Deck
+            New deck
           </button>
+
           <button
-            style={{ ...BTN_BASE, opacity: exportLoading === 'pdf' ? 0.5 : 1 }}
             onClick={() => handleExport('pdf')}
             disabled={exportLoading === 'pdf'}
-          >
-            {exportLoading === 'pdf' ? 'Exporting…' : 'PDF'}
-          </button>
-          <button
             style={{
-              ...BTN_BASE,
-              background: LIME,
-              border: `1px solid ${LIME}`,
-              color: '#0D0D0D',
-              opacity: exportLoading === 'pptx' ? 0.6 : 1,
+              padding: '6px 14px',
+              background: 'none',
+              border: '1px solid #222',
+              borderRadius: 6,
+              color: MUTED,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: exportLoading === 'pdf' ? 'not-allowed' : 'pointer',
+              fontFamily: SYNE,
+              opacity: exportLoading === 'pdf' ? 0.4 : 1,
+              transition: 'border-color 0.15s, color 0.15s, opacity 0.15s',
             }}
-            onClick={() => handleExport('pptx')}
-            disabled={exportLoading === 'pptx'}
+            onMouseEnter={e => { if (exportLoading !== 'pdf') { e.currentTarget.style.borderColor = '#444'; e.currentTarget.style.color = TEXT; }}}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = MUTED; }}
           >
-            {exportLoading === 'pptx' ? 'Exporting…' : 'Export PPTX'}
+            {exportLoading === 'pdf' ? 'Exporting...' : 'PDF'}
+          </button>
+
+          <button
+            onClick={() => handleExport('pptx')}
+            disabled={!!exportLoading}
+            style={{
+              padding: '7px 16px',
+              background: exportLoading === 'pptx' ? '#A0CC00' : LIME,
+              border: 'none',
+              borderRadius: 6,
+              color: '#0A0A0A',
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: exportLoading ? 'not-allowed' : 'pointer',
+              fontFamily: SYNE,
+              opacity: exportLoading && exportLoading !== 'pptx' ? 0.5 : 1,
+              transition: 'opacity 0.15s, background 0.15s, transform 0.1s',
+            }}
+            onMouseEnter={e => { if (!exportLoading) e.currentTarget.style.transform = 'scale(1.02)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            {exportLoading === 'pptx' ? 'Exporting...' : 'Export PPTX'}
           </button>
         </div>
       </div>
@@ -479,6 +651,6 @@ export default function StudioNewPage() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <SlideCanvas deck={generatedDeck} />
       </div>
-    </div>
+    </motion.div>
   );
 }

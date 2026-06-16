@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type TextDensity = 'low' | 'medium' | 'text_heavy';
 
@@ -9,25 +10,48 @@ interface DeckGeneratorProps {
   isLoading?: boolean;
 }
 
-const DENSITY_OPTIONS: { value: TextDensity; label: string; sub: string }[] = [
-  { value: 'low',        label: 'Visual',   sub: '1–2 bullets' },
-  { value: 'medium',     label: 'Balanced', sub: '3–4 bullets' },
-  { value: 'text_heavy', label: 'Dense',    sub: '5–7 bullets' },
+const SYNE = 'var(--font-syne), Syne, sans-serif';
+const MONO = 'var(--font-geist-mono), monospace';
+const LIME = '#C8FF00';
+
+const THEMES = [
+  { value: 'academic',     label: 'Academic' },
+  { value: 'corporate',   label: 'Corporate' },
+  { value: 'deep_space',  label: 'Deep Space' },
+  { value: 'ultra_violet',label: 'Ultra Violet' },
+  { value: 'navy_gold',   label: 'Navy & Gold' },
+  { value: 'minimal',     label: 'Minimal' },
 ];
 
-const SELECT_STYLE: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#F0EEE8',
-  fontSize: 14,
-  fontWeight: 600,
-  fontFamily: 'var(--font-syne), Syne, sans-serif',
-  cursor: 'pointer',
-  outline: 'none',
-  width: '100%',
-  appearance: 'none',
-  WebkitAppearance: 'none',
-};
+const AUDIENCES = [
+  { value: 'general',     label: 'General' },
+  { value: 'executives',  label: 'Executives' },
+  { value: 'technical',   label: 'Technical' },
+  { value: 'students',    label: 'Students' },
+  { value: 'researchers', label: 'Researchers' },
+];
+
+const TONES = [
+  { value: 'professional', label: 'Professional' },
+  { value: 'academic',     label: 'Academic' },
+  { value: 'persuasive',   label: 'Persuasive' },
+  { value: 'casual',       label: 'Casual' },
+];
+
+const DENSITY_OPTIONS: { value: TextDensity; label: string; sub: string }[] = [
+  { value: 'low',        label: 'Visual',   sub: '1-2 bullets' },
+  { value: 'medium',     label: 'Balanced', sub: '3-4 bullets' },
+  { value: 'text_heavy', label: 'Dense',    sub: '5-7 bullets' },
+];
+
+const EXAMPLE_PROMPTS = [
+  'The future of renewable energy in urban cities',
+  'Why electric vehicles will dominate by 2035',
+  'How AI is changing software development',
+  'A startup pitch for a fintech app',
+];
+
+const EASE = [0.32, 0.72, 0, 1] as const;
 
 export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGeneratorProps) {
   const [form, setForm] = useState({
@@ -38,249 +62,459 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
     theme: 'academic',
     text_density: 'medium' as TextDensity,
   });
+  const [focused, setFocused] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const set = (field: string, value: any) =>
-    setForm(prev => ({ ...prev, [field]: value }));
+  const set = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
+  const canSubmit = !isLoading && form.topic_or_prompt.trim().length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSubmit) return;
     onGenerate({ mode: 'quick_prompt', ...form });
   };
 
-  const canSubmit = !isLoading && form.topic_or_prompt.trim().length > 0;
+  const usePrompt = (p: string) => {
+    set('topic_or_prompt', p);
+    textareaRef.current?.focus();
+  };
+
+  const containerVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.07 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
+  };
 
   return (
     <div style={{
-      minHeight: '100vh',
-      background: '#0D0D0D',
+      minHeight: '100dvh',
+      background: '#0A0A0A',
       color: '#F0EEE8',
-      fontFamily: 'var(--font-syne), Syne, sans-serif',
+      fontFamily: SYNE,
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* Header */}
-      <div style={{
-        borderBottom: '1px solid #1E1E1E',
-        padding: '0 48px',
-        height: 56,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+      {/* Nav */}
+      <motion.nav
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: EASE }}
+        style={{
+          height: 52,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 40px',
+          borderBottom: '1px solid #161616',
+          flexShrink: 0,
+        }}
+      >
+        <span style={{
+          fontSize: 13,
+          fontWeight: 800,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: '#F0EEE8',
+        }}>
           SlideSmith
         </span>
-        <span style={{ color: '#2A2A2A', fontSize: 16, lineHeight: 1 }}>/</span>
-        <span style={{ fontSize: 11, color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          New Presentation
+        <span style={{
+          fontSize: 11,
+          color: '#383838',
+          fontFamily: MONO,
+          letterSpacing: '0.08em',
+        }}>
+          AI Presentation Builder
         </span>
-      </div>
+      </motion.nav>
 
       {/* Main */}
       <div style={{
         flex: 1,
-        overflowY: 'auto',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: '48px 24px',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        maxWidth: 1280,
+        width: '100%',
+        margin: '0 auto',
+        padding: '0 40px',
+        gap: 80,
+        alignItems: 'start',
+        paddingTop: 72,
+        paddingBottom: 40,
+        boxSizing: 'border-box',
       }}>
-        <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: 640 }}>
 
-          {/* Headline */}
-          <div style={{ marginBottom: 40 }}>
-            <div style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.25em',
-              textTransform: 'uppercase', color: '#444', marginBottom: 14,
-            }}>
-              Create
-            </div>
-            <h1 style={{
-              fontSize: 'clamp(26px, 4vw, 38px)',
-              fontWeight: 800, lineHeight: 1.1,
-              letterSpacing: '-0.02em', margin: 0,
-            }}>
-              What's this presentation about?
-            </h1>
-          </div>
+        {/* Left: Hero copy */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          style={{ paddingTop: 32, paddingBottom: 32 }}
+        >
+          <motion.div variants={itemVariants} style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            marginBottom: 28,
+            padding: '5px 10px',
+            border: '1px solid #1E1E1E',
+            borderRadius: 4,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: LIME,
+              boxShadow: `0 0 8px ${LIME}`,
+              flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 10, fontFamily: MONO, color: '#555', letterSpacing: '0.1em' }}>
+              Powered by Groq + Llama
+            </span>
+          </motion.div>
 
-          {/* Prompt textarea */}
-          <div style={{ marginBottom: 28 }}>
-            <textarea
-              placeholder="Describe your topic in detail. The more specific, the better the output. E.g. 'Climate change impacts on coastal economies — include sea level data, economic projections, and policy options for a government audience.'"
-              value={form.topic_or_prompt}
-              onChange={e => set('topic_or_prompt', e.target.value)}
-              required
-              style={{
-                width: '100%',
-                minHeight: 130,
-                background: '#111111',
-                border: '1px solid #222',
-                borderRadius: 0,
-                color: '#F0EEE8',
-                fontSize: 14,
-                padding: '16px 18px',
-                resize: 'vertical',
-                fontFamily: 'var(--font-syne), Syne, sans-serif',
-                outline: 'none',
-                lineHeight: 1.65,
-                boxSizing: 'border-box',
-                transition: 'border-color 0.15s',
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#C8FF00'; }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#222'; }}
-            />
-          </div>
+          <motion.h1 variants={itemVariants} style={{
+            fontSize: 'clamp(36px, 4.5vw, 58px)',
+            fontWeight: 800,
+            lineHeight: 1.05,
+            letterSpacing: '-0.03em',
+            margin: '0 0 20px',
+            color: '#F0EEE8',
+          }}>
+            Turn any idea into a presentation.
+          </motion.h1>
 
-          {/* Params row 1: slides + theme */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
-                01 / Slides
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => set('slide_count', Math.max(4, form.slide_count - 1))}
+          <motion.p variants={itemVariants} style={{
+            fontSize: 17,
+            lineHeight: 1.65,
+            color: '#555',
+            margin: '0 0 40px',
+            maxWidth: '50ch',
+          }}>
+            Describe your topic and we handle the rest. Charts, images, and smart slide structure - all included.
+          </motion.p>
+
+          {/* Example prompts */}
+          <motion.div variants={itemVariants}>
+            <p style={{ fontSize: 11, color: '#303030', fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 12 }}>
+              Try an example
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {EXAMPLE_PROMPTS.map((p, i) => (
+                <motion.button
+                  key={i}
+                  whileHover={{ x: 4, color: '#F0EEE8' }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  onClick={() => usePrompt(p)}
                   style={{
-                    width: 28, height: 28, background: 'none',
-                    border: '1px solid #2A2A2A', color: '#888',
-                    cursor: 'pointer', fontSize: 16, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'inherit',
-                  }}
-                >−</button>
-                <span style={{
-                  fontSize: 24, fontWeight: 800, minWidth: 40,
-                  textAlign: 'center', fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {form.slide_count}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => set('slide_count', Math.min(30, form.slide_count + 1))}
-                  style={{
-                    width: 28, height: 28, background: 'none',
-                    border: '1px solid #2A2A2A', color: '#888',
-                    cursor: 'pointer', fontSize: 16, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'inherit',
-                  }}
-                >+</button>
-              </div>
-            </div>
-
-            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
-                02 / Theme
-              </div>
-              <div style={{ position: 'relative' }}>
-                <select value={form.theme} onChange={e => set('theme', e.target.value)} style={SELECT_STYLE}>
-                  <option value="academic"    style={{ background: '#111' }}>Academic (Light)</option>
-                  <option value="corporate"   style={{ background: '#111' }}>Corporate Blue</option>
-                  <option value="deep_space"  style={{ background: '#111' }}>Deep Space</option>
-                  <option value="ultra_violet" style={{ background: '#111' }}>Ultra Violet</option>
-                  <option value="navy_gold"   style={{ background: '#111' }}>Navy & Gold</option>
-                  <option value="minimal"     style={{ background: '#111' }}>Minimal White</option>
-                </select>
-                <span style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: '#444', fontSize: 10, pointerEvents: 'none' }}>▾</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Params row 2: tone + audience */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
-                03 / Tone
-              </div>
-              <div style={{ position: 'relative' }}>
-                <select value={form.tone} onChange={e => set('tone', e.target.value)} style={SELECT_STYLE}>
-                  <option value="professional" style={{ background: '#111' }}>Professional</option>
-                  <option value="academic"     style={{ background: '#111' }}>Academic</option>
-                  <option value="persuasive"   style={{ background: '#111' }}>Persuasive</option>
-                  <option value="casual"       style={{ background: '#111' }}>Casual</option>
-                </select>
-                <span style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: '#444', fontSize: 10, pointerEvents: 'none' }}>▾</span>
-              </div>
-            </div>
-
-            <div style={{ padding: '14px 18px', background: '#111', border: '1px solid #222' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#444', marginBottom: 12 }}>
-                04 / Audience
-              </div>
-              <div style={{ position: 'relative' }}>
-                <select value={form.audience} onChange={e => set('audience', e.target.value)} style={SELECT_STYLE}>
-                  <option value="general"     style={{ background: '#111' }}>General</option>
-                  <option value="executives"  style={{ background: '#111' }}>Executives</option>
-                  <option value="technical"   style={{ background: '#111' }}>Technical</option>
-                  <option value="students"    style={{ background: '#111' }}>Students</option>
-                  <option value="researchers" style={{ background: '#111' }}>Researchers</option>
-                </select>
-                <span style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: '#444', fontSize: 10, pointerEvents: 'none' }}>▾</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Content density */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
-              textTransform: 'uppercase', color: '#444', marginBottom: 12,
-            }}>
-              05 / Content Density
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {DENSITY_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => set('text_density', opt.value)}
-                  style={{
-                    padding: '14px 12px',
-                    background: form.text_density === opt.value ? '#C8FF00' : '#111',
-                    border: form.text_density === opt.value ? '1px solid #C8FF00' : '1px solid #222',
-                    color: form.text_density === opt.value ? '#0D0D0D' : '#888',
-                    cursor: 'pointer',
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 0',
                     textAlign: 'left',
-                    fontFamily: 'var(--font-syne), Syne, sans-serif',
-                    transition: 'all 0.12s',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    color: '#404040',
+                    fontFamily: SYNE,
+                    borderBottom: '1px solid #161616',
+                    transition: 'color 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                   }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{opt.label}</div>
-                  <div style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>{opt.sub}</div>
-                </button>
+                  <span style={{ color: '#2A2A2A', fontSize: 11 }}>→</span>
+                  {p}
+                </motion.button>
               ))}
             </div>
-          </div>
+          </motion.div>
+        </motion.div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            style={{
-              width: '100%',
-              background: canSubmit ? '#C8FF00' : '#161616',
-              color: canSubmit ? '#0D0D0D' : '#333',
-              border: 'none',
-              padding: '18px 24px',
-              fontSize: 12,
-              fontWeight: 800,
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              cursor: canSubmit ? 'pointer' : 'not-allowed',
-              fontFamily: 'var(--font-syne), Syne, sans-serif',
-              transition: 'all 0.12s',
-            }}
-          >
-            {isLoading ? 'Generating…' : 'Generate Presentation →'}
-          </button>
+        {/* Right: Form */}
+        <motion.div
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
+          style={{ paddingBottom: 32 }}
+        >
+          <form onSubmit={handleSubmit}>
 
-          <p style={{ textAlign: 'center', fontSize: 11, color: '#333', marginTop: 14 }}>
-            Runs on Groq (cloud) or Ollama (local) · No data stored
-          </p>
-        </form>
+            {/* Textarea */}
+            <div style={{ position: 'relative', marginBottom: 16 }}>
+              <motion.div
+                animate={{
+                  boxShadow: focused
+                    ? `0 0 0 1px ${LIME}40, 0 0 24px ${LIME}10`
+                    : '0 0 0 1px #1C1C1C',
+                }}
+                transition={{ duration: 0.2 }}
+                style={{ borderRadius: 8, overflow: 'hidden' }}
+              >
+                <textarea
+                  ref={textareaRef}
+                  placeholder="Describe your topic in detail. The more specific, the better. E.g. &quot;Climate impacts on coastal economies with sea level projections and policy options for government officials.&quot;"
+                  value={form.topic_or_prompt}
+                  onChange={e => set('topic_or_prompt', e.target.value)}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  required
+                  style={{
+                    width: '100%',
+                    minHeight: 180,
+                    background: '#0F0F0F',
+                    border: 'none',
+                    outline: 'none',
+                    color: '#F0EEE8',
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    padding: '18px 20px',
+                    resize: 'vertical',
+                    fontFamily: SYNE,
+                    boxSizing: 'border-box',
+                    display: 'block',
+                  }}
+                />
+              </motion.div>
+              <AnimatePresence>
+                {form.topic_or_prompt.length > 0 && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                      position: 'absolute',
+                      bottom: 10,
+                      right: 14,
+                      fontSize: 10,
+                      fontFamily: MONO,
+                      color: '#3A3A3A',
+                    }}
+                  >
+                    {form.topic_or_prompt.length} chars
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Compact options grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 8,
+              marginBottom: 8,
+            }}>
+              {/* Slide count */}
+              <div style={{
+                padding: '12px 16px',
+                background: '#0F0F0F',
+                border: '1px solid #1C1C1C',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: 11, color: '#404040', letterSpacing: '0.05em' }}>Slides</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => set('slide_count', Math.max(4, form.slide_count - 1))}
+                    style={{
+                      width: 24, height: 24, background: '#161616', border: '1px solid #222',
+                      color: '#555', cursor: 'pointer', fontSize: 14, borderRadius: 4,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: SYNE,
+                    }}
+                  >-</button>
+                  <span style={{
+                    fontSize: 18, fontWeight: 800, color: '#F0EEE8',
+                    fontVariantNumeric: 'tabular-nums', minWidth: 28, textAlign: 'center',
+                  }}>
+                    {form.slide_count}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => set('slide_count', Math.min(30, form.slide_count + 1))}
+                    style={{
+                      width: 24, height: 24, background: '#161616', border: '1px solid #222',
+                      color: '#555', cursor: 'pointer', fontSize: 14, borderRadius: 4,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: SYNE,
+                    }}
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Theme */}
+              <div style={{
+                padding: '12px 16px',
+                background: '#0F0F0F',
+                border: '1px solid #1C1C1C',
+                borderRadius: 8,
+                position: 'relative',
+              }}>
+                <label style={{ fontSize: 11, color: '#404040', display: 'block', marginBottom: 4, letterSpacing: '0.05em' }}>
+                  Theme
+                </label>
+                <select
+                  value={form.theme}
+                  onChange={e => set('theme', e.target.value)}
+                  style={{
+                    background: 'none', border: 'none', outline: 'none',
+                    color: '#F0EEE8', fontSize: 13, fontWeight: 600,
+                    fontFamily: SYNE, cursor: 'pointer', width: '100%',
+                    appearance: 'none', WebkitAppearance: 'none',
+                  }}
+                >
+                  {THEMES.map(t => (
+                    <option key={t.value} value={t.value} style={{ background: '#111' }}>{t.label}</option>
+                  ))}
+                </select>
+                <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#333', fontSize: 9, pointerEvents: 'none' }}>▾</span>
+              </div>
+
+              {/* Tone */}
+              <div style={{
+                padding: '12px 16px',
+                background: '#0F0F0F',
+                border: '1px solid #1C1C1C',
+                borderRadius: 8,
+                position: 'relative',
+              }}>
+                <label style={{ fontSize: 11, color: '#404040', display: 'block', marginBottom: 4, letterSpacing: '0.05em' }}>
+                  Tone
+                </label>
+                <select
+                  value={form.tone}
+                  onChange={e => set('tone', e.target.value)}
+                  style={{
+                    background: 'none', border: 'none', outline: 'none',
+                    color: '#F0EEE8', fontSize: 13, fontWeight: 600,
+                    fontFamily: SYNE, cursor: 'pointer', width: '100%',
+                    appearance: 'none', WebkitAppearance: 'none',
+                  }}
+                >
+                  {TONES.map(t => (
+                    <option key={t.value} value={t.value} style={{ background: '#111' }}>{t.label}</option>
+                  ))}
+                </select>
+                <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#333', fontSize: 9, pointerEvents: 'none' }}>▾</span>
+              </div>
+
+              {/* Audience */}
+              <div style={{
+                padding: '12px 16px',
+                background: '#0F0F0F',
+                border: '1px solid #1C1C1C',
+                borderRadius: 8,
+                position: 'relative',
+              }}>
+                <label style={{ fontSize: 11, color: '#404040', display: 'block', marginBottom: 4, letterSpacing: '0.05em' }}>
+                  Audience
+                </label>
+                <select
+                  value={form.audience}
+                  onChange={e => set('audience', e.target.value)}
+                  style={{
+                    background: 'none', border: 'none', outline: 'none',
+                    color: '#F0EEE8', fontSize: 13, fontWeight: 600,
+                    fontFamily: SYNE, cursor: 'pointer', width: '100%',
+                    appearance: 'none', WebkitAppearance: 'none',
+                  }}
+                >
+                  {AUDIENCES.map(a => (
+                    <option key={a.value} value={a.value} style={{ background: '#111' }}>{a.label}</option>
+                  ))}
+                </select>
+                <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#333', fontSize: 9, pointerEvents: 'none' }}>▾</span>
+              </div>
+            </div>
+
+            {/* Content density */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+              {DENSITY_OPTIONS.map(opt => (
+                <motion.button
+                  key={opt.value}
+                  type="button"
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => set('text_density', opt.value)}
+                  style={{
+                    padding: '12px 10px',
+                    background: form.text_density === opt.value ? LIME : '#0F0F0F',
+                    border: `1px solid ${form.text_density === opt.value ? LIME : '#1C1C1C'}`,
+                    color: form.text_density === opt.value ? '#0A0A0A' : '#404040',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontFamily: SYNE,
+                    borderRadius: 8,
+                    transition: 'all 0.15s cubic-bezier(0.32, 0.72, 0, 1)',
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>{opt.sub}</div>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <motion.button
+              type="submit"
+              disabled={!canSubmit}
+              whileHover={canSubmit ? { scale: 1.01 } : {}}
+              whileTap={canSubmit ? { scale: 0.98 } : {}}
+              transition={{ duration: 0.15 }}
+              style={{
+                width: '100%',
+                padding: '18px 24px',
+                background: canSubmit ? LIME : '#141414',
+                border: `1px solid ${canSubmit ? LIME : '#2A2A2A'}`,
+                borderRadius: 8,
+                color: canSubmit ? '#0A0A0A' : '#3A3A3A',
+                fontSize: 13,
+                fontWeight: 800,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+                fontFamily: SYNE,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                transition: 'background 0.2s, color 0.2s',
+                boxShadow: canSubmit ? `0 0 24px ${LIME}25` : 'none',
+              }}
+            >
+              {isLoading ? (
+                <>
+                  <motion.span
+                    animate={{ opacity: [1, 0.4, 1] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                  >
+                    Generating
+                  </motion.span>
+                  <span>...</span>
+                </>
+              ) : (
+                <>
+                  Generate presentation
+                  <span style={{ fontSize: 16 }}>→</span>
+                </>
+              )}
+            </motion.button>
+
+            <p style={{
+              textAlign: 'center',
+              fontSize: 11,
+              color: '#2A2A2A',
+              marginTop: 14,
+              fontFamily: MONO,
+            }}>
+              Takes 60-120 seconds. No data stored.
+            </p>
+          </form>
+        </motion.div>
       </div>
     </div>
   );
