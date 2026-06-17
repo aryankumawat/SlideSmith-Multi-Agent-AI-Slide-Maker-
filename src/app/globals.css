@@ -1,6 +1,41 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* === Stitch Design System Colors (Tailwind v4 theme) === */
+@theme {
+  --color-primary: #a8e8ff;
+  --color-primary-container: #00d4ff;
+  --color-on-primary-container: #00586b;
+  --color-primary-fixed-dim: #3cd7ff;
+  --color-secondary: #d2bbff;
+  --color-secondary-container: #6001d1;
+  --color-on-secondary-container: #c9aeff;
+  --color-secondary-fixed-dim: #d2bbff;
+  --color-tertiary: #ffd9a1;
+  --color-tertiary-fixed-dim: #ffba3d;
+  --color-tertiary-container: #feb528;
+  --color-on-tertiary-container: #6c4900;
+  --color-surface: #121315;
+  --color-surface-dim: #121315;
+  --color-surface-card: #17181C;
+  --color-surface-variant: #343537;
+  --color-surface-container: #1f2022;
+  --color-surface-container-low: #1b1c1e;
+  --color-surface-container-high: #292a2c;
+  --color-surface-container-highest: #343537;
+  --color-surface-container-lowest: #0d0e10;
+  --color-surface-bright: #38393b;
+  --color-background-deep: #0A0A0B;
+  --color-on-surface: #e3e2e4;
+  --color-on-surface-variant: #bbc9cf;
+  --color-outline: #859398;
+  --color-outline-variant: #3c494e;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A1A1AA;
+  --color-border-subtle: rgba(255,255,255,0.08);
+  --color-surface-tint: #3cd7ff;
+}
+
 /* === Lumina Editorial Design Tokens === */
 :root {
   --ss-bg-deep: #0A0A0B;
@@ -235,6 +270,43 @@
     padding: 0;
     background-color: transparent;
   }
+}
+
+/* === Stitch glassmorphism utilities === */
+.glass-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(23, 24, 28, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.accent-glow {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+}
+
+.primary-gradient {
+  background: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+}
+
+.accent-gradient-bg {
+  background: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #343537;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4a4b4d;
 }
 
 @keyframes twinkle {
