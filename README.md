@@ -2,7 +2,7 @@
 
 **Turn any idea into a presentation. Powered by Groq + Llama.**
 
-SlideSmith is an AI presentation generator with a dark editorial interface. Type a topic, pick your settings, and get a fully-structured slide deck with charts, images, speaker notes, and export to PDF or PowerPoint — in about 60–120 seconds.
+SlideSmith is an AI presentation generator with a dark editorial interface. It runs two generation modes: a fast SSE streaming pipeline for real-time output, and a 17-agent collaborative pipeline for maximum quality. Both export to PDF and PowerPoint.
 
 ---
 
@@ -40,12 +40,16 @@ The generation endpoint (`/api/generate-deck`) uses **Server-Sent Events** to st
 
 ## Architecture
 
+SlideSmith has two generation modes, selectable per request:
+
+### Mode 1 — SSE Streaming Pipeline (default UI)
+
 ```
 Browser (SSE client)
     ↓ POST /api/generate-deck
     ← stream: outline event, slide events, done event
 
-Server-side pipeline (src/lib/deck-generator.ts):
+Server-side (src/lib/deck-generator.ts):
   1. Generate outline          (Groq Llama 3.3 70B)
   2. Per-slide generation      (Groq Llama 3.1 8B, parallel)
      - Layout selection
@@ -54,10 +58,71 @@ Server-side pipeline (src/lib/deck-generator.ts):
      - Chart spec (bar, line, pie, area, scatter)
      - Image prompt → LoremFlickr (free, no key)
   3. Stream each slide to client as it completes
+```
 
-Export:
-  POST /api/export/pdf    → PDFKit (landscape, theme-aware)
-  POST /api/export/pptx   → PptxGenJS (native charts, speaker notes)
+Best for: fast drafts, real-time feedback, ~60–120s total.
+
+### Mode 2 — 17-Agent Collaborative Pipeline
+
+```
+POST /api/multi-model-generate
+
+Orchestrated DAG (src/lib/multi-model/orchestrator.ts):
+  Step 1   Researcher            → fact extraction, evidence synthesis
+  Step 2   Structurer            → narrative arc, section decomposition
+  Step 2b  Slide Layout Planner  → optimal visual layout per slide
+  Step 3   Per-section parallel:
+             Slidewriter + Copy Tightener + Readability Analyzer
+             + Media Finder + Data Viz Planner
+  Step 3b  Image Generation Dispatcher → LoremFlickr
+  Step 4   Cross-deck QA (parallel):
+             Fact Checker + Accessibility Linter
+             + Deduplication Agent + Narrative Arc Auditor
+  Step 5   Speaker Notes Generator
+  Step 6   Final Assembly
+  Step 7   Executive Summary (optional)
+  Step 8   Audience Adaptation (optional)
+```
+
+Best for: maximum quality, full QA scores, audience-tuned output. ~2–3 min on Groq.
+
+### Agent Roster
+
+| # | Agent | Role |
+|---|-------|------|
+| 1 | Researcher | Fact extraction, source validation |
+| 2 | Structurer | Narrative arc, section planning |
+| 3 | Slide Layout Planner | Visual layout assignment |
+| 4 | Slidewriter | Content composition per slide |
+| 5 | Copy Tightener | Tone normalisation, consistency |
+| 6 | Readability Analyzer | Flesch-Kincaid scoring |
+| 7 | Media Finder | Asset retrieval, alt-text |
+| 8 | Data Viz Planner | Chart type + encoding |
+| 9 | Image Generation Dispatcher | Prompt → image |
+| 10 | Fact Checker | Claim verification |
+| 11 | Accessibility Linter | WCAG 2.1 AA compliance |
+| 12 | Deduplication & Coherence | Duplicates, contradictions |
+| 13 | Narrative Arc Auditor | Hook/tension/evidence/CTA flow |
+| 14 | Speaker Notes Generator | Presenter guidance + timing |
+| 15 | Executive Summary | Key point distillation |
+| 16 | Audience Adapter | Complexity + tone recalibration |
+| 17 | Live Widget Planner | Real-time data integration |
+
+### Model Routing
+
+| Policy | High-quality agents | Fast agents |
+|--------|--------------------|----|
+| `balanced` (default) | Llama 3.3 70B | Llama 3.1 8B |
+| `quality` | Llama 3.3 70B (all) | — |
+| `speed` | — | Llama 3.1 8B (all) |
+
+All Groq models fall back to Ollama when `GROQ_API_KEY` is not set.
+
+### Export
+
+```
+POST /api/export/pdf    → PDFKit (landscape, theme-aware)
+POST /api/export/pptx   → PptxGenJS (native charts, speaker notes)
 ```
 
 ---
@@ -83,24 +148,47 @@ Export:
 src/
 ├── app/
 │   ├── api/
-│   │   ├── generate-deck/      # Primary SSE streaming endpoint
-│   │   ├── export/pdf/         # PDF export (PDFKit)
-│   │   ├── export/pptx/        # PowerPoint export (PptxGenJS)
-│   │   └── multi-model-generate/ # Legacy 17-agent pipeline
-│   ├── studio-new/             # Main UI (page.tsx)
-│   └── page.tsx                # Root redirect
+│   │   ├── generate-deck/        # SSE streaming endpoint
+│   │   ├── multi-model-generate/ # 17-agent pipeline endpoint
+│   │   ├── export/pdf/           # PDF export (PDFKit)
+│   │   └── export/pptx/          # PowerPoint export (PptxGenJS)
+│   ├── studio-new/               # Main UI (page.tsx)
+│   └── page.tsx                  # Root redirect
 │
 ├── components/
-│   ├── DeckGenerator.tsx       # Prompt form + settings panel
-│   ├── SlideCanvas.tsx         # Slide rendering engine (all layouts + charts)
-│   ├── SlideView.tsx           # Slide navigator + presentation mode
-│   └── blocks/                 # Primitive content blocks
+│   ├── DeckGenerator.tsx         # Prompt form + settings panel
+│   ├── SlideCanvas.tsx           # Slide rendering engine (all layouts + charts)
+│   ├── SlideView.tsx             # Slide navigator + presentation mode
+│   └── blocks/                   # Primitive content blocks
 │
 └── lib/
-    ├── deck-generator.ts       # Core generation logic (outline + per-slide)
-    ├── schema.ts               # TypeScript types (Slide, Deck, ChartSpec)
-    ├── theming.ts              # 6 built-in themes
-    └── multi-model/            # Legacy 17-agent system (still available)
+    ├── deck-generator.ts         # SSE pipeline: outline + per-slide generation
+    ├── schema.ts                 # Core TypeScript types (Slide, Deck, ChartSpec)
+    ├── theming.ts                # 6 built-in themes
+    └── multi-model/              # 17-agent pipeline
+        ├── agents/               # 17 agent implementations
+        │   ├── researcher.ts
+        │   ├── structurer.ts
+        │   ├── slide-layout-planner.ts
+        │   ├── slidewriter.ts
+        │   ├── copy-tightener.ts
+        │   ├── fact-checker.ts
+        │   ├── accessibility-linter.ts
+        │   ├── deduplication-agent.ts
+        │   ├── narrative-arc-auditor.ts
+        │   ├── image-generation-dispatcher.ts
+        │   ├── media-finder.ts
+        │   ├── speaker-notes-generator.ts
+        │   ├── data-viz-planner.ts
+        │   ├── live-widget-planner.ts
+        │   ├── executive-summary.ts
+        │   ├── audience-adapter.ts
+        │   └── readability-analyzer.ts
+        ├── orchestrator.ts       # DAG execution engine (8 steps)
+        ├── base-agent.ts         # Abstract agent base class
+        ├── router.ts             # Model selection by policy
+        ├── schemas.ts            # Zod v4 I/O contracts per agent
+        └── ollama-config.ts      # Groq + Ollama model configs
 ```
 
 ---
@@ -134,7 +222,7 @@ LLM_MODEL=gemma3:4b
 
 ## API
 
-### Generate deck (SSE)
+### SSE streaming generation
 
 ```
 POST /api/generate-deck
@@ -151,7 +239,7 @@ Content-Type: application/json
 }
 ```
 
-Response is an SSE stream. Events:
+Response is an SSE stream:
 
 ```
 event: outline
@@ -162,6 +250,38 @@ data: { "index": 0, "slide": { "layout": "title", "title": "...", ... } }
 
 event: done
 data: { "deck": { "title": "...", "slides": [...] } }
+```
+
+### 17-agent generation
+
+```
+POST /api/multi-model-generate
+Content-Type: application/json
+
+{
+  "topic": "The future of renewable energy",
+  "tone": "Professional",
+  "audience": "executives",
+  "desiredSlideCount": 12,
+  "policy": "balanced"
+}
+```
+
+Response includes the full deck plus 6-dimensional quality scores:
+
+```json
+{
+  "deck": { "id": "...", "title": "...", "slides": [...] },
+  "quality": {
+    "factCheckScore": 0.91,
+    "accessibilityScore": 0.88,
+    "readabilityScore": 0.84,
+    "consistencyScore": 0.93,
+    "narrativeScore": 0.87,
+    "coherenceScore": 0.90
+  },
+  "metadata": { "totalTokens": 14200, "processingTime": 142000 }
+}
 ```
 
 ### Export
@@ -194,11 +314,20 @@ POST /api/export/pptx   Body: { deck: Deck }  → .pptx blob
 
 ## Performance
 
-Groq free tier, 10-slide deck:
-
+**SSE Streaming (10 slides, Groq):**
 - Outline: ~3–5s
-- Per-slide generation (streamed): ~45–90s total
-- **First slide visible: ~8–12s**
+- First slide visible: ~8–12s
+- Full deck: ~60–120s
+
+**17-Agent Pipeline (12 slides, balanced policy, Groq):**
+- Research + Structure: ~15–25s
+- Layout Planning: ~5–8s
+- Per-section parallel (5 agents): ~60–90s
+- Cross-Deck QA (4 agents parallel): ~15–25s
+- Speaker Notes: ~8–12s
+- Total: ~2–3 minutes
+
+**Ollama on Apple M1 Pro 16GB:** same pipelines take ~2× longer; GPU-accelerated via Metal.
 
 ---
 
