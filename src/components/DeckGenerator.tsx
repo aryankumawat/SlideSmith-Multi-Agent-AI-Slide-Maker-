@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type TextDensity = 'low' | 'medium' | 'text_heavy';
+type ContentFormat = 'bullets' | 'paragraph' | 'mixed';
 
 interface DeckGeneratorProps {
   onGenerate: (data: any) => void;
@@ -39,9 +40,15 @@ const TONES = [
 ];
 
 const DENSITY_OPTIONS: { value: TextDensity; label: string; sub: string }[] = [
-  { value: 'low',        label: 'Visual',   sub: '1-2 bullets' },
-  { value: 'medium',     label: 'Balanced', sub: '3-4 bullets' },
-  { value: 'text_heavy', label: 'Dense',    sub: '5-7 bullets' },
+  { value: 'low',        label: 'Visual',   sub: '1-2 points' },
+  { value: 'medium',     label: 'Balanced', sub: '3-4 points' },
+  { value: 'text_heavy', label: 'Dense',    sub: '5-7 points' },
+];
+
+const FORMAT_OPTIONS: { value: ContentFormat; label: string; sub: string }[] = [
+  { value: 'bullets',   label: 'Bullets',    sub: 'list format' },
+  { value: 'mixed',     label: 'Mixed',      sub: 'para + bullets' },
+  { value: 'paragraph', label: 'Paragraphs', sub: 'prose only' },
 ];
 
 const EXAMPLE_PROMPTS = [
@@ -61,6 +68,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
     slide_count: 10,
     theme: 'academic',
     text_density: 'medium' as TextDensity,
+    content_format: 'mixed' as ContentFormat,
   });
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -432,30 +440,62 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               </div>
             </div>
 
-            {/* Content density */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
-              {DENSITY_OPTIONS.map(opt => (
-                <motion.button
-                  key={opt.value}
-                  type="button"
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => set('text_density', opt.value)}
-                  style={{
-                    padding: '12px 10px',
-                    background: form.text_density === opt.value ? LIME : '#0F0F0F',
-                    border: `1px solid ${form.text_density === opt.value ? LIME : '#1C1C1C'}`,
-                    color: form.text_density === opt.value ? '#0A0A0A' : '#404040',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontFamily: SYNE,
-                    borderRadius: 8,
-                    transition: 'all 0.15s cubic-bezier(0.32, 0.72, 0, 1)',
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{opt.label}</div>
-                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>{opt.sub}</div>
-                </motion.button>
-              ))}
+            {/* Content density + format */}
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 10, color: '#303030', fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 8 }}>
+                Content density
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                {DENSITY_OPTIONS.map(opt => (
+                  <motion.button
+                    key={opt.value}
+                    type="button"
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => set('text_density', opt.value)}
+                    style={{
+                      padding: '12px 10px',
+                      background: form.text_density === opt.value ? LIME : '#0F0F0F',
+                      border: `1px solid ${form.text_density === opt.value ? LIME : '#1C1C1C'}`,
+                      color: form.text_density === opt.value ? '#0A0A0A' : '#404040',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontFamily: SYNE,
+                      borderRadius: 8,
+                      transition: 'all 0.15s cubic-bezier(0.32, 0.72, 0, 1)',
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{opt.label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>{opt.sub}</div>
+                  </motion.button>
+                ))}
+              </div>
+              <p style={{ fontSize: 10, color: '#303030', fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 8 }}>
+                Content style
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {FORMAT_OPTIONS.map(opt => (
+                  <motion.button
+                    key={opt.value}
+                    type="button"
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => set('content_format', opt.value)}
+                    style={{
+                      padding: '12px 10px',
+                      background: form.content_format === opt.value ? LIME : '#0F0F0F',
+                      border: `1px solid ${form.content_format === opt.value ? LIME : '#1C1C1C'}`,
+                      color: form.content_format === opt.value ? '#0A0A0A' : '#404040',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontFamily: SYNE,
+                      borderRadius: 8,
+                      transition: 'all 0.15s cubic-bezier(0.32, 0.72, 0, 1)',
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{opt.label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>{opt.sub}</div>
+                  </motion.button>
+                ))}
+              </div>
             </div>
 
             {/* CTA */}

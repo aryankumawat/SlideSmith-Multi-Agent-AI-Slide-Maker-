@@ -21,6 +21,7 @@ const GenerateDeckRequestSchema = z.object({
   slide_count: z.number().min(3).max(50).default(10),
   theme: z.enum(['deep_space', 'ultra_violet', 'minimal', 'corporate', 'academic', 'navy_gold']).default('academic'),
   text_density: z.enum(['low', 'medium', 'text_heavy']).default('medium'),
+  content_format: z.enum(['bullets', 'paragraph', 'mixed']).default('mixed'),
   live_widgets: z.boolean().default(false),
   assets: z.object({
     doc_urls: z.array(z.string()).optional(),
@@ -41,6 +42,8 @@ export type Slide = {
   title: string;
   subtitle?: string;
   bullets?: string[];
+  paragraph?: string;
+  content_format?: 'bullets' | 'paragraph' | 'mixed';
   stat_blocks?: Array<{ value: string; label: string }> | null;
   cards?: Array<{ icon: string; title: string; description: string }> | null;
   notes?: string;
@@ -148,6 +151,7 @@ export async function POST(request: NextRequest) {
     tone: validatedData.tone,
     theme: validatedData.theme,
     text_density: validatedData.text_density,
+    content_format: validatedData.content_format,
     live_widgets: validatedData.live_widgets,
   };
 
@@ -217,6 +221,7 @@ export async function POST(request: NextRequest) {
                   slide_context: slot,
                   per_slide_extracted_text_or_empty: perSlideFacts,
                   text_density: meta.text_density,
+                  content_format: meta.content_format,
                 }),
                 new Promise<never>((_, reject) =>
                   setTimeout(() => reject(new Error(`Slide timed out: ${slot.title}`)), 90000)

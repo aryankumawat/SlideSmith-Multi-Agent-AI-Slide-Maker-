@@ -211,7 +211,7 @@ function distributeSections(total: number, sectionCount: number): number[] {
 }
 
 // ─── Layout-specific slide prompts ────────────────────────────────────────────
-function getLayoutPrompt(layout: string, title: string, bulletCount: number): string {
+function getLayoutPrompt(layout: string, title: string, bulletCount: number, contentFormat = 'mixed'): string {
   switch (layout) {
     case 'title':
       return `Create a title slide for a presentation titled: "${title}"
@@ -379,13 +379,17 @@ Rules:
 - Events MUST be real, specific milestones related to "${title}" with actual years
 JSON:`;
 
-    case 'chart':
+    case 'chart': {
+      const chartParaHint = contentFormat !== 'bullets'
+        ? `"paragraph": "1-2 sentences interpreting what the data shows about ${title}. What is the headline finding?",`
+        : `"paragraph": null,`;
       return `Create a data-driven chart slide about: "${title}"
 
 Return ONLY this JSON:
 {
   "title": "${title}",
   "subtitle": null,
+  ${chartParaHint}
   "bullets": [
     "**Key insight 1**: specific finding with a real statistic about ${title}",
     "**Key insight 2**: another specific finding with a number"
@@ -400,7 +404,9 @@ Return ONLY this JSON:
 Rules:
 - chart_spec MUST have realistic data specific to "${title}"
 - bullets must contain real insights from the data
+- paragraph (if present) should interpret the trend in plain language
 JSON:`;
+    }
 
     case 'split':
     default: {
@@ -409,18 +415,38 @@ JSON:`;
       const chartHint = isDataSlide
         ? `"chart_spec": {"type":"bar","title":"${title}","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[35,48,62,75,91]}],"caption":"Trend 2020-2024"},`
         : `"chart_spec": null,`;
+
+      const paraInstruction = contentFormat === 'bullets'
+        ? `"paragraph": null,`
+        : `"paragraph": "2-3 sentences of flowing prose that explains the core idea of ${title}. Write as a knowledgeable expert, not a list. Include a key fact or statistic.",`;
+
+      const bulletsInstruction = contentFormat === 'paragraph'
+        ? `"bullets": ["One key takeaway as a short punchy bullet"],`
+        : `"bullets": [
+    "**Key term 1**: specific fact or statistic about ${title}",
+    "**Key term 2**: another specific fact with a number",
+    "**Key term 3**: another point with evidence",
+    "**Key term 4**: concluding insight"
+  ],`;
+
+      const contentRules = contentFormat === 'paragraph'
+        ? `- Write a substantive paragraph (2-3 sentences) that reads as prose, not a list
+- Include 1 key takeaway bullet`
+        : contentFormat === 'bullets'
+        ? `- EXACTLY ${bulletCount} bullets, each specific to "${title}" with numbers or facts
+- Bold the key term in each bullet using **asterisks**`
+        : `- Write a paragraph (2-3 sentences) of flowing prose explaining the core concept
+- Also include ${Math.min(bulletCount, 3)} supporting bullet points with specific facts/numbers
+- Bold key terms in bullets using **asterisks**`;
+
       return `Write content for a presentation slide titled: "${title}"
 
 Return ONLY this JSON:
 {
   "title": "${title}",
   "subtitle": null,
-  "bullets": [
-    "**Key term 1**: specific fact or statistic about ${title}",
-    "**Key term 2**: another specific fact with a number",
-    "**Key term 3**: another point with evidence",
-    "**Key term 4**: concluding insight"
-  ],
+  ${paraInstruction}
+  ${bulletsInstruction}
   "stat_blocks": null,
   "cards": null,
   ${chartHint}
@@ -429,10 +455,7 @@ Return ONLY this JSON:
   "citations": []
 }
 Rules:
-- EXACTLY ${bulletCount} bullets
-- Each bullet MUST be about "${title}" with real, specific information
-- Bold the key term in each bullet using **asterisks**
-- Include numbers, percentages, or years where relevant
+${contentRules}
 - If chart_spec is provided, use realistic trend data specific to "${title}"
 JSON:`;
     }
@@ -444,10 +467,13 @@ export async function generateSlide(params: {
   slide_context: any;
   per_slide_extracted_text_or_empty: string;
   text_density?: string;
+  content_format?: 'bullets' | 'paragraph' | 'mixed';
 }): Promise<{
   title: string;
   subtitle?: string;
   bullets: string[];
+  paragraph?: string;
+  content_format?: string;
   stat_blocks?: Array<{ value: string; label: string }> | null;
   cards?: Array<{ icon: string; title: string; description: string }> | null;
   notes: string;
@@ -456,11 +482,12 @@ export async function generateSlide(params: {
   citations: string[];
 }> {
   const density = params.text_density || 'medium';
+  const contentFormat = params.content_format || 'mixed';
   const bulletCount = density === 'low' ? 2 : density === 'text_heavy' ? 6 : 4;
   const layout = params.slide_context.layout || 'title_bullets';
   const slideTitle = params.slide_context.title;
 
-  const prompt = getLayoutPrompt(layout, slideTitle, bulletCount);
+  const prompt = getLayoutPrompt(layout, slideTitle, bulletCount, contentFormat);
 
   try {
     const response = await llmClient.generateContent(prompt);
@@ -471,6 +498,8 @@ export async function generateSlide(params: {
     parsed.citations = parsed.citations || [];
     parsed.diagram_spec = parsed.diagram_spec || null;
     if (!Array.isArray(parsed.bullets)) parsed.bullets = [];
+    parsed.paragraph = parsed.paragraph || null;
+    parsed.content_format = contentFormat;
 
     // Ensure chart for chart/data_insight layouts
     if ((layout === 'chart' || layout === 'data_insight') && !parsed.chart_spec) {

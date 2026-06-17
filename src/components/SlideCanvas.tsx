@@ -17,6 +17,8 @@ interface Slide {
   title: string;
   subtitle?: string;
   bullets?: string[];
+  paragraph?: string;
+  content_format?: 'bullets' | 'paragraph' | 'mixed';
   stat_blocks?: StatBlock[] | null;
   cards?: Card[] | null;
   notes?: string;
@@ -265,6 +267,50 @@ function Bold({ text, accentColor }: { text: string; accentColor: string }) {
           : <span key={i}>{p}</span>
       )}
     </>
+  );
+}
+
+// ─── Content block: renders bullets, paragraph, or mixed ─────────────────────
+function ContentBlock({ slide, theme, scale, maxBullets = 6 }: {
+  slide: Slide; theme: ThemeConfig; scale: number; maxBullets?: number;
+}) {
+  const fmt = slide.content_format || 'mixed';
+  const bullets = slide.bullets || [];
+  const para = slide.paragraph;
+
+  const showPara = para && fmt !== 'bullets';
+  const showBullets = bullets.length > 0 && fmt !== 'paragraph';
+  const showMixed = showPara && showBullets;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(10 * scale), justifyContent: 'center', flex: 1 }}>
+      {showPara && (
+        <p style={{
+          fontSize: Math.round(14 * scale),
+          color: theme.bodyColor,
+          lineHeight: 1.75,
+          margin: 0,
+          maxWidth: '65ch',
+          marginBottom: showMixed ? Math.round(4 * scale) : 0,
+        }}>
+          {para}
+        </p>
+      )}
+      {showMixed && (
+        <div style={{ width: Math.round(32 * scale), height: Math.round(1 * scale), background: theme.accentColor, opacity: 0.4, marginBottom: Math.round(2 * scale) }} />
+      )}
+      {showBullets && bullets.slice(0, maxBullets).map((b, i) => (
+        <div key={i} style={{ display: 'flex', gap: Math.round(9 * scale), alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, width: Math.round(7 * scale), height: Math.round(7 * scale), borderRadius: '50%', marginTop: Math.round(5 * scale), background: PALETTE[i % PALETTE.length] }} />
+          <p style={{ fontSize: Math.round(14 * scale), color: theme.bodyColor, lineHeight: 1.5, margin: 0 }}>
+            <Bold text={b} accentColor={theme.accentColor} />
+          </p>
+        </div>
+      ))}
+      {slide.citations?.slice(0, 1).map((c, i) => (
+        <p key={i} style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, fontStyle: 'italic', marginTop: Math.round(4 * scale) }}>{c}</p>
+      ))}
+    </div>
   );
 }
 
@@ -596,6 +642,7 @@ function SplitSlide({ slide, theme, slideNum, total, scale }: {
   const pad = Math.round(30 * scale);
   const gap = Math.round(18 * scale);
   const bullets = slide.bullets || [];
+  const hasText = bullets.length > 0 || !!slide.paragraph;
   const hasChart = !!slide.chart_spec;
   const hasDiagram = !!slide.diagram_spec;
   const hasImage = !!slide.image?.url;
@@ -609,19 +656,9 @@ function SplitSlide({ slide, theme, slideNum, total, scale }: {
         left: pad, right: pad, bottom: Math.round(22 * scale),
         display: 'flex', gap,
       }}>
-        {bullets.length > 0 && (
-          <div style={{ flex: hasVisual ? '0 0 44%' : 1, display: 'flex', flexDirection: 'column', gap: Math.round(8 * scale), justifyContent: 'center' }}>
-            {bullets.slice(0, 6).map((b, i) => (
-              <div key={i} style={{ display: 'flex', gap: Math.round(8 * scale), alignItems: 'flex-start' }}>
-                <span style={{ flexShrink: 0, width: Math.round(7 * scale), height: Math.round(7 * scale), borderRadius: '50%', marginTop: Math.round(5 * scale), background: PALETTE[i % PALETTE.length] }} />
-                <p style={{ fontSize: Math.round(14 * scale), color: theme.bodyColor, lineHeight: 1.5, margin: 0 }}>
-                  <Bold text={b} accentColor={theme.accentColor} />
-                </p>
-              </div>
-            ))}
-            {slide.citations?.slice(0, 1).map((c, i) => (
-              <p key={i} style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, fontStyle: 'italic', marginTop: Math.round(6 * scale) }}>{c}</p>
-            ))}
+        {hasText && (
+          <div style={{ flex: hasVisual ? '0 0 44%' : 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <ContentBlock slide={slide} theme={theme} scale={scale} maxBullets={6} />
           </div>
         )}
         {hasVisual && (
@@ -826,6 +863,7 @@ function BulletsSlide({ slide, theme, slideNum, total, scale }: {
   const pad = Math.round(30 * scale);
   const gap = Math.round(16 * scale);
   const bullets = slide.bullets || [];
+  const hasText = bullets.length > 0 || !!slide.paragraph;
   const hasChart = !!slide.chart_spec;
   const hasDiagram = !!slide.diagram_spec;
   const hasImage = !!slide.image?.url;
@@ -837,21 +875,11 @@ function BulletsSlide({ slide, theme, slideNum, total, scale }: {
       <div style={{
         position: 'absolute', top: headerH + Math.round(12 * scale),
         left: pad, right: pad, bottom: Math.round(22 * scale),
-        display: 'flex', flexDirection: hasVisual && bullets.length > 0 ? 'row' : 'column', gap,
+        display: 'flex', flexDirection: hasVisual && hasText ? 'row' : 'column', gap,
       }}>
-        {bullets.length > 0 && (
-          <div style={{ flex: hasVisual ? '0 0 44%' : 1, display: 'flex', flexDirection: 'column', gap: Math.round(8 * scale), justifyContent: 'center' }}>
-            {bullets.slice(0, 6).map((b, i) => (
-              <div key={i} style={{ display: 'flex', gap: Math.round(9 * scale), alignItems: 'flex-start' }}>
-                <span style={{ flexShrink: 0, width: Math.round(7 * scale), height: Math.round(7 * scale), borderRadius: '50%', marginTop: Math.round(5 * scale), background: PALETTE[i % PALETTE.length] }} />
-                <p style={{ fontSize: Math.round(14 * scale), color: theme.bodyColor, lineHeight: 1.5, margin: 0 }}>
-                  <Bold text={b} accentColor={theme.accentColor} />
-                </p>
-              </div>
-            ))}
-            {slide.citations?.slice(0, 1).map((c, i) => (
-              <p key={i} style={{ fontSize: Math.round(9 * scale), color: theme.mutedColor, fontStyle: 'italic', marginTop: Math.round(6 * scale) }}>{c}</p>
-            ))}
+        {hasText && (
+          <div style={{ flex: hasVisual ? '0 0 44%' : 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <ContentBlock slide={slide} theme={theme} scale={scale} maxBullets={6} />
           </div>
         )}
         {hasVisual && (
