@@ -71,12 +71,16 @@ export class LLMClient {
         model,
         messages: [
           {
+            role: 'system',
+            content: 'You are an expert presentation writer and subject-matter analyst. You write specific, factual, data-rich slide content. Every claim must reference a real statistic, named technology, specific organisation, or concrete number. You never use vague filler or placeholder language. Respond with valid JSON only — no markdown fences, no commentary.',
+          },
+          {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        temperature: 0.4,
+        max_tokens: 4096,
       }),
     });
 

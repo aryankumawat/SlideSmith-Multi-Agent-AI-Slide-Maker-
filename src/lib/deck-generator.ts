@@ -77,42 +77,35 @@ export async function generateOutline(params: {
   const { slide_count, audience, tone, topic_or_prompt_or_instructions: topic } = params;
   const chartSlides = Math.max(2, Math.round(slide_count * 0.30));
 
-  const prompt = `You are creating a ${slide_count}-slide presentation outline on: "${topic}"
+  const prompt = `Create a ${slide_count}-slide presentation outline on: "${topic}"
 Audience: ${audience}. Tone: ${tone}.
 
-Return ONLY valid JSON, no other text:
+Each slide title must be SPECIFIC and INFORMATIVE — name exact concepts, technologies, statistics, or questions relevant to "${topic}". Never use generic titles like "Introduction", "Key Points", or "Slide 3".
+
+Return ONLY valid JSON:
 
 {
-  "title": "Engaging presentation title about ${topic}",
+  "title": string,         // A sharp, specific title for the whole presentation
   "sections": [
     {
-      "name": "Introduction",
+      "name": string,      // Section name (e.g. "Background & Context", "Core Mechanisms", "Evidence & Data")
       "slides": [
-        {"title": "Specific slide title 1", "layout": "title_bullets", "section": "Introduction"},
-        {"title": "Specific slide title 2", "layout": "title_bullets", "section": "Introduction"}
-      ]
-    },
-    {
-      "name": "Main Content",
-      "slides": [
-        {"title": "Specific slide title 3", "layout": "title_bullets", "section": "Main Content"},
-        {"title": "Data and Statistics", "layout": "chart", "section": "Main Content"},
-        {"title": "Specific slide title 5", "layout": "title_bullets", "section": "Main Content"}
-      ]
-    },
-    {
-      "name": "Conclusion",
-      "slides": [
-        {"title": "Summary and Key Takeaways", "layout": "title_bullets", "section": "Conclusion"}
+        {"title": string, "layout": "title_bullets", "section": string},
+        ...
       ]
     }
   ]
 }
 
+Available layouts: title_bullets, chart, grid_cards, data_insight, comparison, timeline, split, center_focus, section_divider
+
 RULES:
-- Total slides across ALL sections must equal EXACTLY ${slide_count}
-- ${chartSlides} slide(s) should use layout "chart"
-- Each slide title must be specific and informative about "${topic}"
+- Total slides across ALL sections must be EXACTLY ${slide_count}
+- Include EXACTLY ${chartSlides} slide(s) with layout "chart" or "data_insight"
+- Slide titles must be concrete and specific to "${topic}" — e.g. "How Transformer Attention Mechanisms Enable Scale" not "How It Works"
+- Vary layouts across sections for visual variety
+- First slide of each section after the Introduction should use "section_divider"
+- Last slide should use "center_focus"
 
 JSON:`;
 
@@ -205,122 +198,137 @@ function distributeSections(total: number, sectionCount: number): number[] {
 
 // ─── Layout-specific slide prompts ────────────────────────────────────────────
 function getLayoutPrompt(layout: string, title: string, bulletCount: number, contentFormat = 'mixed'): string {
+  const QUALITY_RULE = `CRITICAL: Every piece of content must be SPECIFIC to "${title}". Include real numbers, named organisations, actual technologies, or verifiable facts. Generic filler like "Key Point 1" or placeholder values are UNACCEPTABLE.`;
+
   switch (layout) {
     case 'title':
-      return `Create a title slide for a presentation titled: "${title}"
+      return `Write a title slide for the presentation: "${title}"
 
-Return ONLY this JSON:
+JSON schema (fill every field with real, specific content — no placeholders):
 {
-  "title": "${title}",
-  "subtitle": "A compelling subtitle in 15-20 words capturing the essence of this presentation",
-  "bullets": ["First key theme of the presentation", "Second key theme", "Third key theme"],
+  "title": string,          // the exact presentation title
+  "subtitle": string,       // one compelling sentence (15-20 words) summarising the core argument or scope
+  "bullets": [string, string, string],  // three specific themes or questions this presentation answers
   "stat_blocks": null,
   "cards": null,
   "chart_spec": null,
   "diagram_spec": null,
-  "notes": "Welcome audience and set expectations.",
+  "notes": string,          // one sentence speaker note for opening
   "citations": []
 }
-JSON:`;
+${QUALITY_RULE}
+Respond with JSON only.`;
 
     case 'section_divider':
-      return `Create a section divider slide for the section: "${title}"
+      return `Write a section divider slide for the section: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
-  "subtitle": "One compelling tagline for this section in 10-15 words",
-  "bullets": ["One sentence about what this section explores or reveals"],
+  "title": string,    // section name
+  "subtitle": string, // one punchy tagline (10-15 words) that hooks the audience into this section
+  "bullets": [string], // one sentence previewing the section's key argument or finding
   "stat_blocks": null,
   "cards": null,
   "chart_spec": null,
   "diagram_spec": null,
-  "notes": "Transition to this section.",
+  "notes": string,
   "citations": []
 }
-JSON:`;
+${QUALITY_RULE}
+Respond with JSON only.`;
 
     case 'center_focus':
-      return `Create a high-impact summary slide about: "${title}"
-This is the FINAL slide — make it memorable with real statistics.
+      return `Write the FINAL summary slide for the topic: "${title}"
 
-Return ONLY this JSON:
+This is the closing slide. Make every stat real and impactful.
+
+JSON schema:
 {
-  "title": "${title}",
-  "subtitle": "The single most important takeaway as one powerful sentence",
+  "title": string,
+  "subtitle": string,   // the single most important takeaway — one powerful, specific sentence
   "stat_blocks": [
-    {"value": "XX%", "label": "specific metric about ${title}"},
-    {"value": "$XXB", "label": "specific metric about ${title}"},
-    {"value": "XXx", "label": "specific metric about ${title}"}
+    {"value": string, "label": string},  // e.g. "$4.7T" / "Global AI market by 2032"
+    {"value": string, "label": string},  // e.g. "38%" / "Annual productivity gain (McKinsey)"
+    {"value": string, "label": string}   // e.g. "2.4B" / "Users impacted worldwide"
   ],
-  "bullets": ["One final call-to-action or key recommendation sentence"],
+  "bullets": [string],  // one concrete call-to-action or recommendation
   "cards": null,
   "chart_spec": null,
   "diagram_spec": null,
-  "notes": "Closing remarks and Q&A invitation.",
+  "notes": string,
   "citations": []
 }
-Rules:
-- stat_blocks MUST have REAL statistics with actual numbers about "${title}"
-- subtitle must be a powerful, specific sentence
-JSON:`;
+${QUALITY_RULE}
+Every stat_block value must be a real number/percentage with a specific source context in the label.
+Respond with JSON only.`;
 
     case 'grid_cards':
-      return `Create a grid cards slide showing 4 key aspects of: "${title}"
+      return `Write a four-card overview slide for the topic: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
+  "title": string,
   "subtitle": null,
   "bullets": [],
   "stat_blocks": null,
   "cards": [
-    {"icon": "🔬", "title": "First Aspect", "description": "Specific fact with a number in 10-12 words"},
-    {"icon": "📊", "title": "Second Aspect", "description": "Specific fact with a number in 10-12 words"},
-    {"icon": "⚡", "title": "Third Aspect", "description": "Specific fact with a number in 10-12 words"},
-    {"icon": "🛡️", "title": "Fourth Aspect", "description": "Specific fact with a number in 10-12 words"}
+    {"icon": string, "title": string, "description": string},
+    {"icon": string, "title": string, "description": string},
+    {"icon": string, "title": string, "description": string},
+    {"icon": string, "title": string, "description": string}
   ],
   "chart_spec": null,
   "diagram_spec": null,
   "notes": "",
   "citations": []
 }
-Rules:
-- Each card title and description MUST be specific to "${title}"
-- Use relevant, varied emoji icons
-- Include actual statistics or facts in descriptions
-JSON:`;
+Each card:
+- icon: a single relevant emoji
+- title: 2-4 word named aspect of "${title}" (e.g. a technology, method, or dimension)
+- description: one sentence with a specific fact, percentage, dollar figure, or named example about that aspect
+${QUALITY_RULE}
+Respond with JSON only.`;
 
     case 'data_insight':
-      return `Create a data and statistics slide about: "${title}"
+      return `Write a data and statistics slide for the topic: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
+  "title": string,
   "subtitle": null,
   "stat_blocks": [
-    {"value": "$XX.XB", "label": "Market or Key Metric"},
-    {"value": "XX%", "label": "Growth or Rate Metric"},
-    {"value": "XXM", "label": "Scale or Volume Metric"}
+    {"value": string, "label": string},
+    {"value": string, "label": string},
+    {"value": string, "label": string}
   ],
-  "bullets": ["**Key trend**: one specific insight from the data with a real statistic about ${title}"],
+  "bullets": [string],
   "cards": null,
-  "chart_spec": {"type":"bar","title":"${title} Trends","x_label":"Year","y_label":"Value","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,68,79,95]}],"caption":"Growth trend 2020-2024"},
+  "chart_spec": {
+    "type": "bar",
+    "title": string,
+    "x_label": string,
+    "y_label": string,
+    "labels": [string, string, string, string, string],
+    "datasets": [{"label": string, "data": [number, number, number, number, number]}],
+    "caption": string
+  },
   "diagram_spec": null,
   "notes": "",
   "citations": []
 }
 Rules:
-- stat_blocks MUST have real numbers/percentages specifically about "${title}"
-- chart data must reflect realistic trends for "${title}"
-JSON:`;
+- stat_blocks: three real metrics for "${title}" — actual dollar amounts, percentages, or counts with context labels
+- bullets[0]: one sentence insight explaining the chart trend with a specific stat
+- chart_spec: generate REALISTIC numbers for "${title}" — do NOT use placeholder values like 42,55,68. Research what actual growth looks like for this topic and use plausible real-world figures. Set meaningful x_label and y_label (e.g. "Year" / "Revenue (USD Billions)").
+${QUALITY_RULE}
+Respond with JSON only.`;
 
     case 'comparison':
-      return `Create a comparison slide contrasting two aspects of: "${title}"
+      return `Write a before-vs-after or traditional-vs-modern comparison slide for: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
+  "title": string,
   "subtitle": null,
   "bullets": [],
   "stat_blocks": null,
@@ -329,27 +337,28 @@ Return ONLY this JSON:
   "diagram_spec": {
     "type": "comparison",
     "left": {
-      "title": "Traditional Approach",
-      "items": ["specific point 1 with data", "specific point 2", "specific point 3"]
+      "title": string,
+      "items": [string, string, string]
     },
     "right": {
-      "title": "Modern Approach",
-      "items": ["specific improved point 1 with data", "specific improved point 2", "specific improved point 3"]
+      "title": string,
+      "items": [string, string, string]
     }
   },
   "notes": "",
   "citations": []
 }
-Rules:
-- Both sides MUST relate specifically to "${title}" with concrete details
-JSON:`;
+- left.title / right.title: name the two sides specifically (e.g. "Legacy Systems" vs "Cloud-Native AI")
+- Each item: one specific fact or measurable difference, not a generic phrase
+${QUALITY_RULE}
+Respond with JSON only.`;
 
     case 'timeline':
-      return `Create a timeline slide showing the progression of: "${title}"
+      return `Write a timeline slide showing the key milestones of: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
+  "title": string,
   "subtitle": null,
   "bullets": [],
   "stat_blocks": null,
@@ -358,85 +367,95 @@ Return ONLY this JSON:
   "diagram_spec": {
     "type": "timeline",
     "events": [
-      {"year": "2019", "label": "First milestone", "description": "brief real context"},
-      {"year": "2020", "label": "Second milestone", "description": "brief real context"},
-      {"year": "2021", "label": "Third milestone", "description": "brief real context"},
-      {"year": "2022", "label": "Fourth milestone", "description": "brief real context"},
-      {"year": "2023", "label": "Fifth milestone", "description": "brief real context"}
+      {"year": string, "label": string, "description": string},
+      {"year": string, "label": string, "description": string},
+      {"year": string, "label": string, "description": string},
+      {"year": string, "label": string, "description": string},
+      {"year": string, "label": string, "description": string}
     ]
   },
   "notes": "",
   "citations": []
 }
-Rules:
-- Events MUST be real, specific milestones related to "${title}" with actual years
-JSON:`;
+- Each event: a REAL named milestone in the history of "${title}" with the actual year it occurred
+- description: one short sentence with a specific fact about that milestone
+${QUALITY_RULE}
+Respond with JSON only.`;
 
     case 'chart': {
       const chartParaHint = contentFormat !== 'bullets'
-        ? `"paragraph": "1-2 sentences interpreting what the data shows about ${title}. What is the headline finding?",`
+        ? `"paragraph": string,   // 1-2 sentences interpreting the headline finding from the chart data`
         : `"paragraph": null,`;
-      return `Create a data-driven chart slide about: "${title}"
+      return `Write a data-driven chart slide for the topic: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
+  "title": string,
   "subtitle": null,
   ${chartParaHint}
-  "bullets": [
-    "**Key insight 1**: specific finding with a real statistic about ${title}",
-    "**Key insight 2**: another specific finding with a number"
-  ],
+  "bullets": [string, string],
   "stat_blocks": null,
   "cards": null,
-  "chart_spec": {"type":"bar","title":"${title} — Data","x_label":"Year","y_label":"Value","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,61,74,88]}],"caption":"Trend 2020-2024"},
+  "chart_spec": {
+    "type": "bar",
+    "title": string,
+    "x_label": string,
+    "y_label": string,
+    "labels": [string, string, string, string, string],
+    "datasets": [{"label": string, "data": [number, number, number, number, number]}],
+    "caption": string
+  },
   "diagram_spec": null,
   "notes": "",
   "citations": []
 }
-Rules:
-- chart_spec MUST have realistic data specific to "${title}"
-- bullets must contain real insights from the data
-- paragraph (if present) should interpret the trend in plain language
-JSON:`;
+- bullets[0..1]: two specific insights from the data — must cite numbers from the chart
+- chart_spec: generate REALISTIC, topic-specific data for "${title}". Choose meaningful axis labels and a time range or category breakdown that makes sense for this subject. Do NOT use placeholder values [42,55,61,74,88].
+- If the topic involves market size, use billions (USD). If adoption rate, use percentages. Match the data to what is actually known about "${title}".
+${QUALITY_RULE}
+Respond with JSON only.`;
     }
 
+    case 'title_bullets':
     case 'split':
     default: {
-      const dataKeywords = ['growth', 'rate', 'percent', 'market', 'statistic', 'trend', 'revenue', 'cost', 'adoption', 'increase', 'decrease', 'rise', 'impact', 'number', 'billion', 'million'];
+      const dataKeywords = ['growth', 'rate', 'percent', 'market', 'statistic', 'trend', 'revenue', 'cost', 'adoption', 'increase', 'decrease', 'rise', 'impact', 'billion', 'million'];
       const isDataSlide = dataKeywords.some(kw => title.toLowerCase().includes(kw));
+
       const chartHint = isDataSlide
-        ? `"chart_spec": {"type":"bar","title":"${title}","x_label":"Year","y_label":"Value","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[35,48,62,75,91]}],"caption":"Trend 2020-2024"},`
+        ? `"chart_spec": {
+    "type": "bar",
+    "title": string,
+    "x_label": string,
+    "y_label": string,
+    "labels": [string, string, string, string, string],
+    "datasets": [{"label": string, "data": [number, number, number, number, number]}],
+    "caption": string
+  },`
         : `"chart_spec": null,`;
 
       const paraInstruction = contentFormat === 'bullets'
         ? `"paragraph": null,`
-        : `"paragraph": "2-3 sentences of flowing prose that explains the core idea of ${title}. Write as a knowledgeable expert, not a list. Include a key fact or statistic.",`;
+        : `"paragraph": string,   // 2-3 sentences of substantive prose explaining the core concept of "${title}" — written as a knowledgeable expert, not a list. Must include at least one specific fact or named example.`;
 
       const bulletsInstruction = contentFormat === 'paragraph'
-        ? `"bullets": ["One key takeaway as a short punchy bullet"],`
-        : `"bullets": [
-    "**Key term 1**: specific fact or statistic about ${title}",
-    "**Key term 2**: another specific fact with a number",
-    "**Key term 3**: another point with evidence",
-    "**Key term 4**: concluding insight"
-  ],`;
+        ? `"bullets": [string],   // one punchy key takeaway`
+        : `"bullets": [string, string, string${bulletCount > 3 ? ', string' : ''}],   // ${bulletCount} bullets, each with a bolded key term and a specific fact/stat`;
 
       const contentRules = contentFormat === 'paragraph'
-        ? `- Write a substantive paragraph (2-3 sentences) that reads as prose, not a list
-- Include 1 key takeaway bullet`
+        ? `- paragraph: 2-3 sentences of substantive expert prose — include at least one specific statistic or named example
+- bullets[0]: one punchy key takeaway sentence`
         : contentFormat === 'bullets'
-        ? `- EXACTLY ${bulletCount} bullets, each specific to "${title}" with numbers or facts
-- Bold the key term in each bullet using **asterisks**`
-        : `- Write a paragraph (2-3 sentences) of flowing prose explaining the core concept
-- Also include ${Math.min(bulletCount, 3)} supporting bullet points with specific facts/numbers
-- Bold key terms in bullets using **asterisks**`;
+        ? `- Exactly ${bulletCount} bullets. Format: "**Bold Term**: specific fact or statistic with a real number"
+- Do NOT write generic statements. Every bullet must reference something concrete about "${title}"`
+        : `- paragraph: 2-3 sentences of expert prose with at least one specific stat or named example
+- ${Math.min(bulletCount, 3)} bullets formatted as "**Bold Term**: specific fact or statistic"`;
 
-      return `Write content for a presentation slide titled: "${title}"
+      return `Write slide content for the topic: "${title}"
 
-Return ONLY this JSON:
+JSON schema:
 {
-  "title": "${title}",
+  "title": string,
   "subtitle": null,
   ${paraInstruction}
   ${bulletsInstruction}
@@ -449,8 +468,9 @@ Return ONLY this JSON:
 }
 Rules:
 ${contentRules}
-- If chart_spec is provided, use realistic trend data specific to "${title}"
-JSON:`;
+${isDataSlide ? `- chart_spec: generate realistic, topic-specific numbers for "${title}" — do NOT use [35,48,62,75,91] or any generic sequence. Use real-world plausible data.` : ''}
+${QUALITY_RULE}
+Respond with JSON only.`;
     }
   }
 }
