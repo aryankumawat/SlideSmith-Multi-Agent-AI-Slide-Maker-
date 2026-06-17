@@ -29,11 +29,6 @@ interface Deck {
 
 const SYNE = 'var(--font-syne), Syne, sans-serif';
 const MONO = 'var(--font-geist-mono), monospace';
-const LIME = '#C8FF00';
-const BG = '#0A0A0A';
-const BORDER = '#161616';
-const TEXT = '#F0EEE8';
-const MUTED = '#404040';
 
 const EASE = [0.32, 0.72, 0, 1] as const;
 
@@ -62,8 +57,6 @@ export default function StudioNewPage() {
   const [loadingState, setLoadingState] = useState<LoadingState>(LOADING_INIT);
   const [generatedDeck, setGeneratedDeck] = useState<Deck | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [exportLoading, setExportLoading] = useState<string | null>(null);
-
   const handleGenerate = async (data: any) => {
     setIsLoading(true);
     setError(null);
@@ -145,62 +138,6 @@ export default function StudioNewPage() {
 
   const strip = (text: string) =>
     text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').trim();
-
-  const handleExport = async (format: 'pptx' | 'pdf' | 'json') => {
-    if (!generatedDeck) return;
-    setExportLoading(format);
-    try {
-      if (format === 'json') {
-        const blob = new Blob([JSON.stringify(generatedDeck, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `${strip(generatedDeck.title)}.json`; a.click();
-        URL.revokeObjectURL(url);
-        return;
-      }
-
-      const endpoint = format === 'pptx' ? '/api/export/pptx' : '/api/export/pdf';
-      const body = format === 'pptx' ? generatedDeck : convertForPdf(generatedDeck);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deck: body }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Export failed' }));
-        throw new Error(err.error || response.statusText);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${strip(generatedDeck.title)}.${format}`; a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setExportLoading(null);
-    }
-  };
-
-  const convertForPdf = (deck: Deck) => ({
-    id: `deck-${Date.now()}`,
-    title: strip(deck.title),
-    theme: deck.theme,
-    meta: { title: strip(deck.title), theme: deck.theme, audience: 'general', tone: 'professional' },
-    slides: deck.slides.map((slide, idx) => ({
-      id: `slide-${idx}`,
-      layout: slide.layout || 'title-content',
-      blocks: [
-        { type: 'Heading', text: strip(slide.title), level: 1 },
-        ...(slide.bullets?.length ? [{ type: 'Bullets', items: slide.bullets.map(strip) }] : []),
-      ],
-      notes: slide.notes || '',
-      citations: slide.citations || [],
-    })),
-  });
 
   // ── Loading screen ───────────────────────────────────────────────────────────
   if (isLoading) {
@@ -436,7 +373,7 @@ export default function StudioNewPage() {
   // ── Generator form ────────────────────────────────────────────────────────────
   if (!generatedDeck) {
     return (
-      <div>
+      <>
         <AnimatePresence>
           {error && (
             <motion.div
@@ -447,8 +384,10 @@ export default function StudioNewPage() {
               style={{
                 position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
                 zIndex: 50, maxWidth: 520, width: 'calc(100% - 32px)',
-                background: '#150808', border: '1px solid #3A1010',
-                padding: '14px 18px', fontFamily: SYNE, borderRadius: 8,
+                background: 'var(--ss-surface-card)',
+                border: '1px solid rgba(255,100,100,0.2)',
+                padding: '14px 18px', fontFamily: SYNE,
+                borderRadius: 'var(--ss-radius)',
               }}
             >
               <p style={{ fontWeight: 700, fontSize: 11, color: '#FF6B6B', marginBottom: 3, letterSpacing: '0.06em' }}>
@@ -458,8 +397,10 @@ export default function StudioNewPage() {
             </motion.div>
           )}
         </AnimatePresence>
-        <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
-      </div>
+        <StudioShell status="AI Presentation Builder">
+          <DeckGenerator onGenerate={handleGenerate} isLoading={isLoading} />
+        </StudioShell>
+      </>
     );
   }
 
@@ -469,142 +410,64 @@ export default function StudioNewPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100dvh',
-        overflow: 'hidden',
-        background: BG,
-        fontFamily: SYNE,
-      }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}
     >
-      {/* Top bar */}
-      <div style={{
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 20px 0 28px',
-        height: 52,
-        borderBottom: `1px solid ${BORDER}`,
-      }}>
-        {/* Left */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <span style={{
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: TEXT,
-            flexShrink: 0,
-          }}>
-            SlideSmith
-          </span>
-          <span style={{ color: '#242424', fontSize: 12 }}>/</span>
-          <span style={{
-            fontSize: 12,
-            color: MUTED,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: 320,
-          }}>
-            {strip(generatedDeck.title)}
-          </span>
-          <span style={{
-            fontSize: 10,
-            color: '#242424',
-            flexShrink: 0,
-            fontFamily: MONO,
-          }}>
-            {generatedDeck.slides.length} slides
-          </span>
+      <StudioShell
+        status={`${strip(generatedDeck.title)} · ${generatedDeck.slides.length} slides`}
+        actions={
+          <>
+            {error && (
+              <span style={{
+                fontSize: 11, color: '#FF6B6B',
+                maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {error}
+              </span>
+            )}
+            <button
+              onClick={() => { setGeneratedDeck(null); setError(null); }}
+              style={{
+                padding: '6px 14px',
+                background: 'none',
+                border: '1px solid var(--ss-border)',
+                borderRadius: 'var(--ss-radius)',
+                color: 'var(--ss-text-secondary)',
+                fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+                cursor: 'pointer', fontFamily: SYNE,
+                transition: 'border-color 0.15s, color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = 'var(--ss-text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ss-border)'; e.currentTarget.style.color = 'var(--ss-text-secondary)'; }}
+            >
+              New deck
+            </button>
+            <Link href="/export" style={{ textDecoration: 'none' }}>
+              <button
+                style={{
+                  padding: '7px 16px',
+                  background: 'var(--ss-gradient)',
+                  border: 'none',
+                  borderRadius: 'var(--ss-radius)',
+                  color: '#fff',
+                  fontSize: 11, fontWeight: 800,
+                  letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+                  cursor: 'pointer', fontFamily: SYNE,
+                  transition: 'opacity 0.15s, transform 0.1s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                Export →
+              </button>
+            </Link>
+          </>
+        }
+      >
+        <div style={{ height: 'calc(100dvh - 52px)' }}>
+          <SlideCanvas deck={generatedDeck} />
         </div>
-
-        {/* Right: actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {error && (
-            <span style={{ fontSize: 11, color: '#FF6B6B', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {error}
-            </span>
-          )}
-
-          <button
-            onClick={() => { setGeneratedDeck(null); setError(null); }}
-            style={{
-              padding: '6px 14px',
-              background: 'none',
-              border: '1px solid #222',
-              borderRadius: 6,
-              color: MUTED,
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              fontFamily: SYNE,
-              transition: 'border-color 0.15s, color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#444'; e.currentTarget.style.color = TEXT; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = MUTED; }}
-          >
-            New deck
-          </button>
-
-          <button
-            onClick={() => handleExport('pdf')}
-            disabled={exportLoading === 'pdf'}
-            style={{
-              padding: '6px 14px',
-              background: 'none',
-              border: '1px solid #222',
-              borderRadius: 6,
-              color: MUTED,
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: exportLoading === 'pdf' ? 'not-allowed' : 'pointer',
-              fontFamily: SYNE,
-              opacity: exportLoading === 'pdf' ? 0.4 : 1,
-              transition: 'border-color 0.15s, color 0.15s, opacity 0.15s',
-            }}
-            onMouseEnter={e => { if (exportLoading !== 'pdf') { e.currentTarget.style.borderColor = '#444'; e.currentTarget.style.color = TEXT; }}}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = MUTED; }}
-          >
-            {exportLoading === 'pdf' ? 'Exporting...' : 'PDF'}
-          </button>
-
-          <button
-            onClick={() => handleExport('pptx')}
-            disabled={!!exportLoading}
-            style={{
-              padding: '7px 16px',
-              background: exportLoading === 'pptx' ? '#A0CC00' : LIME,
-              border: 'none',
-              borderRadius: 6,
-              color: '#0A0A0A',
-              fontSize: 11,
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: exportLoading ? 'not-allowed' : 'pointer',
-              fontFamily: SYNE,
-              opacity: exportLoading && exportLoading !== 'pptx' ? 0.5 : 1,
-              transition: 'opacity 0.15s, background 0.15s, transform 0.1s',
-            }}
-            onMouseEnter={e => { if (!exportLoading) e.currentTarget.style.transform = 'scale(1.02)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            {exportLoading === 'pptx' ? 'Exporting...' : 'Export PPTX'}
-          </button>
-        </div>
-      </div>
-
-      {/* Slide canvas */}
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <SlideCanvas deck={generatedDeck} />
-      </div>
+      </StudioShell>
     </motion.div>
   );
 }
