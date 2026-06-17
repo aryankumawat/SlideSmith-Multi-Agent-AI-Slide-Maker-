@@ -442,24 +442,25 @@ export default function StudioNewPage() {
             >
               New deck
             </button>
-            <Link href="/export" style={{ textDecoration: 'none' }}>
-              <button
-                style={{
-                  padding: '7px 16px',
-                  background: 'var(--ss-gradient)',
-                  border: 'none',
-                  borderRadius: 'var(--ss-radius)',
-                  color: '#fff',
-                  fontSize: 11, fontWeight: 800,
-                  letterSpacing: '0.08em', textTransform: 'uppercase' as const,
-                  cursor: 'pointer', fontFamily: SYNE,
-                  transition: 'opacity 0.15s, transform 0.1s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-              >
-                Export →
-              </button>
+            <Link
+              href="/export"
+              style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '7px 16px',
+                background: 'var(--ss-gradient)',
+                border: 'none',
+                borderRadius: 'var(--ss-radius)',
+                color: '#fff',
+                fontSize: 11, fontWeight: 800,
+                letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+                cursor: 'pointer', fontFamily: SYNE,
+                textDecoration: 'none',
+                transition: 'opacity 0.15s, transform 0.1s',
+              }}
+              onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+              onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              Export →
             </Link>
           </>
         }
