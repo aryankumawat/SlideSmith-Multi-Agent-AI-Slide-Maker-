@@ -1,6 +1,27 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* === Lumina Editorial Design Tokens === */
+:root {
+  --ss-bg-deep: #0A0A0B;
+  --ss-surface: #121315;
+  --ss-surface-card: #17181C;
+  --ss-surface-high: #292a2c;
+  --ss-border: rgba(255, 255, 255, 0.08);
+  --ss-text: #FFFFFF;
+  --ss-text-secondary: #A1A1AA;
+  --ss-cyan: #00D4FF;
+  --ss-violet: #7C3AED;
+  --ss-gradient: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+  --ss-radius: 0.75rem;
+  --ss-radius-lg: 1.25rem;
+}
+
+@keyframes ss-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
