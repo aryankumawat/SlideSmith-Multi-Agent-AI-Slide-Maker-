@@ -24,100 +24,124 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('Error generating PDF:', error);
     return NextResponse.json(
-      { error: 'Failed to generate PDF' },
+      { error: `Failed to generate PDF: ${msg}` },
       { status: 500 }
     );
   }
 }
 
+function stripMdForPDF(text: string): string {
+  return text
+    .replace(/^>\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
 async function generatePDF(deck: Deck): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      // Create PDF document (landscape for presentation)
       const doc = new PDFDocument({
-        size: [792, 612], // Landscape (11" x 8.5")
-        margins: { top: 50, bottom: 50, left: 60, right: 60 }
+        size: [792, 612],
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        autoFirstPage: false,
       });
-      
+
       const chunks: Buffer[] = [];
-      
-      // Collect PDF chunks
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-      
-      // Get theme colors
+
       const theme = getThemeForPDF(deck.theme || 'deep_space');
-      
-      // Add each slide as a page
+
       deck.slides.forEach((slide: any, index: number) => {
-        if (index > 0) {
-          doc.addPage();
-        }
-        
-        // Set background
+        doc.addPage({ size: [792, 612], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+        // Background
         doc.rect(0, 0, 792, 612).fill(theme.background);
-        
-        // Add slide number
-        doc.fontSize(10).fillColor(theme.textSecondary)
-           .text(`${index + 1} / ${deck.slides.length}`, 720, 570);
-        
-        // Add slide title
-        if (slide.blocks) {
-          const heading = slide.blocks.find((b: any) => b.type === 'Heading');
-          if (heading && heading.text) {
-            doc.fontSize(32).fillColor(theme.primary)
-               .text(heading.text, 60, 60, { width: 672, align: 'left' });
+
+        let yPos = 55;
+
+        // Title heading at top
+        const titleText: string = (() => {
+          if (slide.blocks) {
+            const h = slide.blocks.find((b: any) => b.type === 'Heading');
+            return h?.text || '';
           }
-          
-          // Add bullets
-          const bullets = slide.blocks.find((b: any) => b.type === 'Bullets');
-          if (bullets && bullets.items) {
-            let yPos = 140;
-            doc.fontSize(18).fillColor(theme.text);
-            
-            bullets.items.slice(0, 5).forEach((bullet: string) => {
-              // Truncate long bullets
-              const truncated = bullet.length > 80 ? bullet.substring(0, 77) + '...' : bullet;
-              doc.text(`• ${truncated}`, 80, yPos, { width: 632, lineGap: 8 });
-              yPos += 60;
+          return slide.title || '';
+        })();
+
+        if (titleText) {
+          doc.fontSize(28).fillColor(theme.primary)
+             .text(titleText, 55, yPos, { width: 682, align: 'left' });
+          yPos += 48;
+        }
+
+        // Accent line under title
+        doc.rect(55, yPos, 682, 2).fill(theme.primary);
+        yPos += 10;
+
+        if (slide.blocks) {
+          // Subheading
+          const sub = slide.blocks.find((b: any) => b.type === 'Subheading');
+          if (sub?.text) {
+            doc.fontSize(14).fillColor(theme.textSecondary)
+               .text(sub.text, 55, yPos, { width: 682 });
+            yPos += 28;
+          }
+
+          // Markdown blocks (description + key figure)
+          const mdBlocks = slide.blocks.filter((b: any) => b.type === 'Markdown');
+          for (const md of mdBlocks) {
+            if (md.md && yPos < 520) {
+              const clean = stripMdForPDF(md.md);
+              if (clean) {
+                doc.fontSize(12).fillColor(theme.textSecondary)
+                   .text(clean, 55, yPos, { width: 682, lineGap: 3 });
+                yPos += 36;
+              }
+            }
+          }
+
+          // Bullets
+          const bulletsBlock = slide.blocks.find((b: any) => b.type === 'Bullets');
+          if (bulletsBlock?.items) {
+            doc.fontSize(15).fillColor(theme.text);
+            bulletsBlock.items.slice(0, 6).forEach((bullet: string) => {
+              if (yPos < 545) {
+                const truncated = bullet.length > 85 ? bullet.substring(0, 82) + '...' : bullet;
+                doc.text(`•  ${truncated}`, 65, yPos, { width: 672, lineGap: 4 });
+                yPos += 44;
+              }
             });
           }
         } else if (slide.title) {
-          // Handle new format (title + bullets)
-          doc.fontSize(32).fillColor(theme.primary)
-             .text(slide.title, 60, 60, { width: 672, align: 'left' });
-          
-            if (slide.bullets && Array.isArray(slide.bullets)) {
-                let yPos = 140;
-                doc.fontSize(18).fillColor(theme.text);
-                
-                // NO truncation - use proper text wrapping instead
-                const maxBullets = Math.min(slide.bullets.length, 8);
-                const bulletSpacing = (612 - 140 - 70) / maxBullets; // Dynamic spacing
-                
-                slide.bullets.slice(0, maxBullets).forEach((bullet: string, idx: number) => {
-                  // Use PDFKit's built-in text wrapping (no manual truncation!)
-                  doc.text(`• ${bullet}`, 80, yPos, { 
-                    width: 632,
-                    lineGap: 6,
-                    ellipsis: false, // Don't add "..." 
-                  });
-                  yPos += Math.min(bulletSpacing, 65); // Adaptive spacing
-                });
+          // Flat format (title + bullets)
+          if (slide.bullets?.length) {
+            const maxB = Math.min(slide.bullets.length, 7);
+            doc.fontSize(15).fillColor(theme.text);
+            slide.bullets.slice(0, maxB).forEach((bullet: string) => {
+              if (yPos < 545) {
+                doc.text(`•  ${bullet}`, 65, yPos, { width: 672, lineGap: 4 });
+                yPos += 44;
               }
+            });
+          }
         }
-        
-        // Add footer
-        const title = deck.title || '';
-        if (title) {
-          doc.fontSize(10).fillColor(theme.textSecondary)
-             .text(title, 60, 570, { width: 600, align: 'left' });
-        }
+
+        // Footer: title left, slide number right
+        doc.fontSize(9).fillColor(theme.textSecondary)
+           .text(deck.title || '', 55, 585, { width: 500, align: 'left' });
+        doc.fontSize(9).fillColor(theme.textSecondary)
+           .text(`${index + 1} / ${deck.slides.length}`, 672, 585, { width: 70, align: 'right' });
       });
-      
+
       doc.end();
     } catch (error) {
       reject(error);

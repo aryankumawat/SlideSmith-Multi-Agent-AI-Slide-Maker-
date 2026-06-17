@@ -3,10 +3,59 @@ import { Deck, Slide, SlideBlock } from '@/lib/schema';
 import PptxGenJS from 'pptxgenjs';
 import { exportToAdvancedPPTX } from '@/lib/pptx-advanced-exporter';
 
+function stripMdSyntax(text: string): string {
+  return text
+    .replace(/^>\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
+function convertBlocksDeckToAdvancedFormat(deck: any): any {
+  if (!deck?.slides?.length) return deck;
+  return {
+    title: deck.title || 'Presentation',
+    theme: deck.theme || 'DeepSpace',
+    slides: deck.slides.map((slide: any) => {
+      // If already in flat format (has a string title, no blocks), pass through
+      if (!slide.blocks && typeof slide.title === 'string') return slide;
+
+      const blocks: any[] = slide.blocks || [];
+      const heading = blocks.find((b: any) => b.type === 'Heading');
+      const subheading = blocks.find((b: any) => b.type === 'Subheading');
+      const mdBlocks = blocks.filter((b: any) => b.type === 'Markdown');
+      const bulletBlocks = blocks.filter((b: any) => b.type === 'Bullets');
+
+      // Convert markdown blocks to plain text bullets
+      const mdBullets = mdBlocks
+        .map((b: any) => stripMdSyntax(b.md || ''))
+        .filter(Boolean);
+
+      // Collect bullet items
+      const bulletItems = bulletBlocks.flatMap((b: any) => b.items || []);
+
+      const allBullets = [...mdBullets, ...bulletItems];
+
+      return {
+        title: heading?.text || slide.id || 'Slide',
+        subtitle: subheading?.text,
+        bullets: allBullets.length > 0 ? allBullets : undefined,
+        notes: slide.notes,
+        layout: slide.layout === 'title' ? 'title' : undefined,
+      };
+    }),
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { deck } = await request.json();
-    
+
     if (!deck) {
       return NextResponse.json(
         { error: 'Deck data is required' },
@@ -14,26 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[PPTX Export] Received deck:', {
-      title: deck.title,
-      theme: deck.theme,
-      slideCount: deck.slides?.length || 0,
-      firstSlideKeys: deck.slides?.[0] ? Object.keys(deck.slides[0]) : [],
-      hasBlocks: !!deck.slides?.[0]?.blocks,
-      hasBullets: !!deck.slides?.[0]?.bullets,
-    });
+    // Convert blocks-format deck to the flat format the advanced exporter expects
+    const advancedDeck = convertBlocksDeckToAdvancedFormat(deck);
 
-    // Try advanced exporter first (for new format with charts, images, wrapping)
     let pptxBuffer: Buffer;
     try {
-      console.log('[PPTX Export] Attempting advanced export...');
-      pptxBuffer = await exportToAdvancedPPTX(deck);
-      console.log('[PPTX Export] Advanced export successful!');
+      pptxBuffer = await exportToAdvancedPPTX(advancedDeck);
     } catch (advancedError) {
       console.warn('[PPTX Export] Advanced export failed, falling back to legacy:', advancedError);
-      // Fallback to legacy exporter for old format
       pptxBuffer = await generatePPTX(deck);
-      console.log('[PPTX Export] Legacy export completed');
     }
     
     return new NextResponse(pptxBuffer as any, {
@@ -153,49 +191,51 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 function addTitleBulletsContent(pptxSlide: any, blocks: SlideBlock[], themeColors: any) {
-  if (!blocks) return; // Guard against undefined blocks
-  
+  if (!blocks) return;
+
   const heading = blocks.find(b => b.type === 'Heading');
   const subheading = blocks.find(b => b.type === 'Subheading');
+  const markdownBlocks = blocks.filter(b => b.type === 'Markdown');
   const bullets = blocks.find(b => b.type === 'Bullets');
-  
+
+  let currentY = 0.45;
+
   if (heading && 'text' in heading) {
     pptxSlide.addText(heading.text, {
-      x: 0.5,
-      y: 0.5,
-      w: 9,
-      h: 0.8,
-      fontSize: 36,
-      color: themeColors.text,
-      bold: true,
+      x: 0.5, y: currentY, w: 9, h: 0.82,
+      fontSize: 32, color: themeColors.text, bold: true, wrap: true,
     });
+    currentY += 0.9;
   }
-  
+
   if (subheading && 'text' in subheading) {
     pptxSlide.addText(subheading.text, {
-      x: 0.5,
-      y: 1.3,
-      w: 9,
-      h: 0.5,
-      fontSize: 18,
-      color: themeColors.textSecondary,
+      x: 0.5, y: currentY, w: 9, h: 0.45,
+      fontSize: 16, color: themeColors.textSecondary, wrap: true,
     });
+    currentY += 0.55;
   }
-  
+
+  for (const md of markdownBlocks) {
+    if ('md' in md) {
+      const clean = stripMdSyntax(md.md);
+      if (clean && currentY < 4.8) {
+        pptxSlide.addText(clean, {
+          x: 0.5, y: currentY, w: 9, h: 0.5,
+          fontSize: 13, color: themeColors.textSecondary, italic: true, wrap: true,
+        });
+        currentY += 0.62;
+      }
+    }
+  }
+
   if (bullets && 'items' in bullets) {
-    // Truncate bullets to prevent overflow (max 80 chars per bullet)
-    const truncatedItems = bullets.items.map(item => truncateText(item, 80));
-    // Limit to 5 bullets max for better readability
-    const limitedItems = truncatedItems.slice(0, 5);
-    const bulletText = limitedItems.map(item => `• ${item}`).join('\n');
+    const items = bullets.items.slice(0, 6).map(item => truncateText(item, 85));
+    const bulletText = items.map(item => `• ${item}`).join('\n');
+    const remainH = Math.max(5.1 - currentY - 0.2, 1.2);
     pptxSlide.addText(bulletText, {
-      x: 0.5,
-      y: 2,
-      w: 9,
-      h: 3,
-      fontSize: 18, // Reduced from 20 to fit more text
-      color: themeColors.text,
-      lineSpacing: 28, // Reduced from 32 for tighter spacing
+      x: 0.5, y: currentY, w: 9, h: remainH,
+      fontSize: 16, color: themeColors.text, lineSpacing: 26, wrap: true,
     });
   }
 }
