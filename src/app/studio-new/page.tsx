@@ -1447,6 +1447,35 @@ export default function StudioNewPage() {
     setError(null);
     setLoadingState(LOADING_INIT);
 
+    // Map internal form shape → API schema
+    const THEME_MAP: Record<string, string> = {
+      dark_modern: 'deep_space',
+      corporate_blue: 'corporate',
+      minimal_white: 'minimal',
+      academic_research: 'academic',
+      creative_bold: 'ultra_violet',
+      nature_green: 'minimal',
+    };
+    const DENSITY_MAP: Record<string, string> = {
+      balanced: 'medium',
+      minimal: 'low',
+      detailed: 'text_heavy',
+      low: 'low',
+      medium: 'medium',
+      text_heavy: 'text_heavy',
+    };
+
+    const payload = {
+      mode: 'quick_prompt',
+      topic_or_prompt: data.topic ?? data.topic_or_prompt ?? '',
+      slide_count: data.num_slides ?? data.slide_count ?? 10,
+      theme: THEME_MAP[data.theme] ?? data.theme ?? 'deep_space',
+      tone: data.tone ?? 'professional',
+      audience: data.audience ?? 'general',
+      text_density: DENSITY_MAP[data.text_density] ?? data.text_density ?? 'medium',
+      content_format: data.content_format ?? 'mixed',
+    };
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 600000);
@@ -1454,7 +1483,7 @@ export default function StudioNewPage() {
       const response = await fetch('/api/generate-deck', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);

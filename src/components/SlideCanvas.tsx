@@ -119,16 +119,33 @@ function buildChartData(spec: any) {
 function SlideChart({ spec, scale, width = 400, height = 250 }: { spec: any; scale: number; width?: number; height?: number }) {
   const type = (spec?.type || 'bar').toLowerCase();
   const { data, keys } = buildChartData(spec);
-  const fontSize = Math.max(8, Math.round(9 * scale));
-  const commonProps = { data, width, height, margin: { top: 4, right: 8, left: -16, bottom: 2 } };
-  const axisProps = { tick: { fontSize }, stroke: '#94a3b8' };
-  const tooltipStyle = { fontSize: 10, padding: 4 };
+  const fontSize = Math.max(7, Math.round(8 * scale));
+  const xLabel: string | undefined = spec?.x_label ?? spec?.datasets?.[0]?.xLabel ?? undefined;
+  const yLabel: string | undefined = spec?.y_label ?? spec?.datasets?.[0]?.label ?? (keys.length === 1 ? keys[0] : undefined);
+  const hasLongLabels = data.some((d: any) => String(d.name).length > 5);
+  const bottomMargin = hasLongLabels ? Math.max(36, Math.round(40 * scale)) : Math.max(20, Math.round(24 * scale));
+  const leftMargin = Math.max(32, Math.round(36 * scale));
+  const commonProps = { data, width, height, margin: { top: 8, right: 16, left: leftMargin, bottom: bottomMargin } };
+  const xAxisProps = {
+    dataKey: 'name',
+    tick: { fontSize, fill: '#94a3b8' },
+    stroke: '#94a3b8',
+    ...(hasLongLabels ? { angle: -35, textAnchor: 'end' as const, interval: 0 } : {}),
+    ...(xLabel ? { label: { value: xLabel, position: 'insideBottom' as const, offset: -6, fontSize, fill: '#94a3b8' } } : {}),
+  };
+  const yAxisProps = {
+    tick: { fontSize, fill: '#94a3b8' },
+    stroke: '#94a3b8',
+    width: leftMargin,
+    ...(yLabel ? { label: { value: yLabel, angle: -90, position: 'insideLeft' as const, offset: -leftMargin + 10, fontSize, fill: '#94a3b8' } } : {}),
+  };
+  const tooltipStyle = { fontSize: 10, padding: 4, background: '#1f2022', border: '1px solid rgba(255,255,255,0.08)', color: '#e3e2e4' };
 
   if (type === 'pie' || type === 'doughnut') {
     const pieData = data.map((d: any) => ({ name: d.name, value: d[keys[0]] ?? 0 }));
     return (
       <PieChart>
-        <Pie data={pieData} cx="50%" cy="50%" innerRadius={type === 'doughnut' ? '35%' : 0} outerRadius="72%" paddingAngle={3} dataKey="value">
+        <Pie data={pieData} cx="50%" cy="45%" innerRadius={type === 'doughnut' ? '35%' : 0} outerRadius="65%" paddingAngle={3} dataKey="value">
           {pieData.map((_: any, i: number) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
         </Pie>
         <Tooltip contentStyle={tooltipStyle} />
@@ -139,8 +156,8 @@ function SlideChart({ spec, scale, width = 400, height = 250 }: { spec: any; sca
   if (type === 'line') return (
     <LineChart {...commonProps}>
       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f020" />
-      <XAxis dataKey="name" {...axisProps} />
-      <YAxis {...axisProps} />
+      <XAxis {...xAxisProps} />
+      <YAxis {...yAxisProps} />
       <Tooltip contentStyle={tooltipStyle} />
       {keys.length > 1 && <Legend wrapperStyle={{ fontSize }} />}
       {keys.map((k: string, i: number) => <Line key={k} type="monotone" dataKey={k} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={{ r: 2 }} />)}
@@ -155,8 +172,8 @@ function SlideChart({ spec, scale, width = 400, height = 250 }: { spec: any; sca
         </linearGradient>
       ))}</defs>
       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f020" />
-      <XAxis dataKey="name" {...axisProps} />
-      <YAxis {...axisProps} />
+      <XAxis {...xAxisProps} />
+      <YAxis {...yAxisProps} />
       <Tooltip contentStyle={tooltipStyle} />
       {keys.map((k: string, i: number) => <Area key={k} type="monotone" dataKey={k} stroke={PALETTE[i % PALETTE.length]} fill={`url(#ag${i})`} strokeWidth={2} />)}
     </AreaChart>
@@ -164,8 +181,8 @@ function SlideChart({ spec, scale, width = 400, height = 250 }: { spec: any; sca
   return (
     <BarChart {...commonProps}>
       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f020" />
-      <XAxis dataKey="name" {...axisProps} />
-      <YAxis {...axisProps} />
+      <XAxis {...xAxisProps} />
+      <YAxis {...yAxisProps} />
       <Tooltip contentStyle={tooltipStyle} />
       {keys.length > 1 && <Legend wrapperStyle={{ fontSize }} />}
       {keys.map((k: string, i: number) => (

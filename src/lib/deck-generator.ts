@@ -1,13 +1,6 @@
-import { LLMClient, LLMConfig } from './llm';
+import { createLLMClient } from './llm';
 
-const getLLMConfig = (): LLMConfig => ({
-  provider: (process.env.LLM_PROVIDER || 'ollama') as 'openai' | 'ollama' | 'demo',
-  apiKey: process.env.LLM_API_KEY || 'ollama',
-  baseUrl: process.env.LLM_BASE_URL || 'http://localhost:11434',
-  model: process.env.LLM_MODEL || 'gemma3:4b',
-});
-
-const llmClient = new LLMClient(getLLMConfig());
+const llmClient = createLLMClient();
 
 // ─── JSON extractor ────────────────────────────────────────────────────────────
 function extractJSON(raw: string): any {
@@ -312,7 +305,7 @@ Return ONLY this JSON:
   ],
   "bullets": ["**Key trend**: one specific insight from the data with a real statistic about ${title}"],
   "cards": null,
-  "chart_spec": {"type":"bar","title":"${title} Trends","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,68,79,95]}],"caption":"Growth trend 2020-2024"},
+  "chart_spec": {"type":"bar","title":"${title} Trends","x_label":"Year","y_label":"Value","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,68,79,95]}],"caption":"Growth trend 2020-2024"},
   "diagram_spec": null,
   "notes": "",
   "citations": []
@@ -396,7 +389,7 @@ Return ONLY this JSON:
   ],
   "stat_blocks": null,
   "cards": null,
-  "chart_spec": {"type":"bar","title":"${title} — Data","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,61,74,88]}],"caption":"Trend 2020-2024"},
+  "chart_spec": {"type":"bar","title":"${title} — Data","x_label":"Year","y_label":"Value","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[42,55,61,74,88]}],"caption":"Trend 2020-2024"},
   "diagram_spec": null,
   "notes": "",
   "citations": []
@@ -413,7 +406,7 @@ JSON:`;
       const dataKeywords = ['growth', 'rate', 'percent', 'market', 'statistic', 'trend', 'revenue', 'cost', 'adoption', 'increase', 'decrease', 'rise', 'impact', 'number', 'billion', 'million'];
       const isDataSlide = dataKeywords.some(kw => title.toLowerCase().includes(kw));
       const chartHint = isDataSlide
-        ? `"chart_spec": {"type":"bar","title":"${title}","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[35,48,62,75,91]}],"caption":"Trend 2020-2024"},`
+        ? `"chart_spec": {"type":"bar","title":"${title}","x_label":"Year","y_label":"Value","labels":["2020","2021","2022","2023","2024"],"datasets":[{"label":"Value","data":[35,48,62,75,91]}],"caption":"Trend 2020-2024"},`
         : `"chart_spec": null,`;
 
       const paraInstruction = contentFormat === 'bullets'
