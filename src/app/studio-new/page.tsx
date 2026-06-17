@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DeckGenerator from '@/components/DeckGenerator';
 import { SlideCanvas } from '@/components/SlideCanvas';
+import StudioShell from '@/components/StudioShell';
+import Link from 'next/link';
 
 interface Slide {
   layout: string;
@@ -123,6 +125,7 @@ export default function StudioNewPage() {
             }));
           } else if (event.type === 'complete') {
             setGeneratedDeck(event.deck);
+            sessionStorage.setItem('ss-deck', JSON.stringify(event.deck));
             setIsLoading(false);
             return;
           } else if (event.type === 'error') {
@@ -205,46 +208,20 @@ export default function StudioNewPage() {
     const hasOutline = slideTopics.length > 0;
 
     return (
-      <div style={{
-        minHeight: '100dvh',
-        background: BG,
-        color: TEXT,
-        fontFamily: SYNE,
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        {/* Nav */}
-        <div style={{
-          height: 52,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 40px',
-          borderBottom: `1px solid ${BORDER}`,
-          flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-            SlideSmith
-          </span>
-          <span style={{ fontSize: 11, color: MUTED, fontFamily: MONO, letterSpacing: '0.08em' }}>
-            {message}
-          </span>
-        </div>
+      <StudioShell status={message}>
+        <div style={{ display: 'flex', overflow: 'hidden', height: 'calc(100dvh - 52px)' }}>
 
-        {/* Body */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-
-          {/* Left: Big progress */}
+          {/* Left panel */}
           <div style={{
             flex: '0 0 420px',
             padding: '64px 48px',
-            borderRight: `1px solid ${BORDER}`,
+            borderRight: '1px solid var(--ss-border)',
+            background: 'var(--ss-surface-card)',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
           }}>
             <div>
-              {/* Progress number */}
               <div style={{ marginBottom: 48 }}>
                 <motion.div
                   key={Math.floor(progress / 5)}
@@ -256,40 +233,40 @@ export default function StudioNewPage() {
                     fontWeight: 800,
                     letterSpacing: '-0.04em',
                     lineHeight: 1,
-                    color: progress > 0 ? LIME : '#1A1A1A',
+                    color: progress > 0 ? 'var(--ss-cyan)' : 'var(--ss-surface-high)',
                     fontVariantNumeric: 'tabular-nums',
                     transition: 'color 0.4s',
                   }}
                 >
-                  {progress}<span style={{ fontSize: '0.5em', fontWeight: 400, color: '#2A2A2A' }}>%</span>
+                  {progress}<span style={{ fontSize: '0.5em', fontWeight: 400, color: 'var(--ss-surface-high)' }}>%</span>
                 </motion.div>
 
-                {/* Progress bar */}
+                {/* Gradient progress bar with shimmer */}
                 <div style={{
-                  marginTop: 20,
-                  width: '100%',
-                  height: 3,
-                  background: '#141414',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  position: 'relative',
+                  marginTop: 20, width: '100%', height: 3,
+                  background: 'var(--ss-surface-high)',
+                  borderRadius: 2, overflow: 'hidden', position: 'relative',
                 }}>
                   <motion.div
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
                     style={{
-                      position: 'absolute',
-                      left: 0, top: 0,
+                      position: 'absolute', left: 0, top: 0,
                       height: '100%',
-                      background: LIME,
+                      background: 'var(--ss-gradient)',
                       borderRadius: 2,
-                      boxShadow: `0 0 12px ${LIME}60`,
+                      overflow: 'hidden',
                     }}
-                  />
+                  >
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
+                      animation: 'ss-shimmer 1.8s ease-in-out infinite',
+                    }} />
+                  </motion.div>
                 </div>
               </div>
 
-              {/* Deck title */}
               <AnimatePresence mode="wait">
                 {deckTitle ? (
                   <motion.h2
@@ -299,11 +276,9 @@ export default function StudioNewPage() {
                     transition={{ duration: 0.5, ease: EASE }}
                     style={{
                       fontSize: 'clamp(18px, 2.5vw, 24px)',
-                      fontWeight: 800,
-                      lineHeight: 1.2,
+                      fontWeight: 800, lineHeight: 1.2,
                       letterSpacing: '-0.02em',
-                      color: TEXT,
-                      margin: 0,
+                      color: 'var(--ss-text)', margin: 0,
                     }}
                   >
                     {deckTitle}
@@ -314,7 +289,7 @@ export default function StudioNewPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    style={{ fontSize: 15, color: '#2A2A2A', margin: 0, fontStyle: 'italic' }}
+                    style={{ fontSize: 15, color: 'var(--ss-surface-high)', margin: 0, fontStyle: 'italic' }}
                   >
                     Planning structure...
                   </motion.p>
@@ -325,7 +300,7 @@ export default function StudioNewPage() {
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  style={{ fontSize: 12, color: MUTED, marginTop: 8, fontFamily: MONO }}
+                  style={{ fontSize: 12, color: 'var(--ss-text-secondary)', marginTop: 8, fontFamily: MONO }}
                 >
                   {completedSlides} of {totalSlides} slides written
                 </motion.p>
@@ -336,21 +311,21 @@ export default function StudioNewPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
                 { label: 'Plan structure', done: hasOutline || progress >= 10 },
-                { label: 'Write slides', done: completedSlides === totalSlides && totalSlides > 0 },
+                { label: 'Write slides',   done: completedSlides === totalSlides && totalSlides > 0 },
                 { label: 'Generate visuals', done: progress >= 95 },
               ].map((phase, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <motion.div
                     animate={{
-                      background: phase.done ? LIME : '#1A1A1A',
-                      boxShadow: phase.done ? `0 0 8px ${LIME}80` : 'none',
+                      background: phase.done ? 'var(--ss-cyan)' : 'var(--ss-surface-high)',
+                      boxShadow: phase.done ? '0 0 8px rgba(0,212,255,0.5)' : 'none',
                     }}
                     transition={{ duration: 0.4 }}
                     style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0 }}
                   />
                   <span style={{
                     fontSize: 13,
-                    color: phase.done ? '#666' : '#2A2A2A',
+                    color: phase.done ? 'var(--ss-text-secondary)' : 'var(--ss-surface-high)',
                     textDecoration: phase.done ? 'line-through' : 'none',
                     transition: 'color 0.3s',
                   }}>
@@ -365,7 +340,7 @@ export default function StudioNewPage() {
           <div style={{ flex: 1, padding: '64px 48px', overflowY: 'auto' }}>
             {!hasOutline ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <p style={{ fontSize: 11, color: '#2A2A2A', fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 8 }}>
+                <p style={{ fontSize: 11, color: 'var(--ss-surface-high)', fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 8 }}>
                   Generating outline...
                 </p>
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -375,10 +350,8 @@ export default function StudioNewPage() {
                     animate={{ opacity: [0.2, 0.5, 0.2] }}
                     transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
                     style={{
-                      height: 16,
-                      background: '#141414',
-                      borderRadius: 3,
-                      width: `${45 + (i % 4) * 12}%`,
+                      height: 16, background: 'var(--ss-surface-card)',
+                      borderRadius: 3, width: `${45 + (i % 4) * 12}%`,
                     }}
                   />
                 ))}
@@ -386,21 +359,16 @@ export default function StudioNewPage() {
             ) : (
               <div>
                 <p style={{
-                  fontSize: 11,
-                  color: MUTED,
-                  fontFamily: MONO,
-                  letterSpacing: '0.08em',
-                  marginBottom: 24,
+                  fontSize: 11, color: 'var(--ss-text-secondary)',
+                  fontFamily: MONO, letterSpacing: '0.08em', marginBottom: 24,
                 }}>
                   {totalSlides} slides
                 </p>
-
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {slideTopics.map((title, i) => {
                     const slideNum = i + 1;
                     const isDone = slideNum <= completedSlides;
                     const isCurrent = slideNum === completedSlides + 1;
-
                     return (
                       <motion.div
                         key={i}
@@ -408,60 +376,46 @@ export default function StudioNewPage() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.35, delay: i * 0.04, ease: EASE }}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 16,
+                          display: 'flex', alignItems: 'center', gap: 16,
                           padding: '11px 0',
-                          borderBottom: `1px solid ${BORDER}`,
+                          borderBottom: '1px solid var(--ss-border)',
                         }}
                       >
-                        {/* Status */}
                         <div style={{ width: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
                           {isDone ? (
-                            <span style={{ fontSize: 10, color: LIME, fontWeight: 700 }}>✓</span>
+                            <span style={{ fontSize: 10, color: 'var(--ss-cyan)', fontWeight: 700 }}>✓</span>
                           ) : isCurrent ? (
                             <motion.span
                               animate={{ opacity: [1, 0.4, 1] }}
                               transition={{ duration: 0.9, repeat: Infinity }}
-                              style={{ fontSize: 10, color: TEXT }}
-                            >
-                              →
-                            </motion.span>
+                              style={{ fontSize: 10, color: 'var(--ss-text)' }}
+                            >→</motion.span>
                           ) : (
                             <span style={{
-                              fontSize: 10, color: '#242424',
+                              fontSize: 10, color: 'var(--ss-surface-high)',
                               fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
                             }}>
                               {String(slideNum).padStart(2, '0')}
                             </span>
                           )}
                         </div>
-
-                        {/* Title */}
                         <span style={{
                           fontSize: 13,
                           fontWeight: isCurrent ? 600 : 400,
-                          color: isDone ? '#303030' : isCurrent ? TEXT : '#222',
-                          flex: 1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          color: isDone ? 'var(--ss-surface-high)' : isCurrent ? 'var(--ss-text)' : 'var(--ss-surface-high)',
+                          flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           transition: 'color 0.3s',
                         }}>
                           {title}
                         </span>
-
                         {isCurrent && (
                           <motion.span
                             animate={{ opacity: [1, 0.5, 1] }}
                             transition={{ duration: 1.1, repeat: Infinity }}
                             style={{
-                              fontSize: 9,
-                              color: LIME,
-                              letterSpacing: '0.12em',
-                              textTransform: 'uppercase',
-                              fontFamily: MONO,
-                              flexShrink: 0,
+                              fontSize: 9, color: 'var(--ss-cyan)',
+                              letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+                              fontFamily: MONO, flexShrink: 0,
                             }}
                           >
                             writing
@@ -475,7 +429,7 @@ export default function StudioNewPage() {
             )}
           </div>
         </div>
-      </div>
+      </StudioShell>
     );
   }
 
