@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const FONT = 'var(--font-syne), Syne, sans-serif';
-const BG = '#0D0D0D';
-const TEXT = '#F0EEE8';
-const LIME = '#C8FF00';
-const MUTED = '#555';
-const BORDER = '#1E1E1E';
+const BG = 'var(--ss-bg-deep)';
+const TEXT = 'var(--ss-text)';
+const MUTED = 'var(--ss-text-secondary)';
+const BORDER = 'var(--ss-border)';
+const CYAN = 'var(--ss-cyan)';
+const GRADIENT = 'var(--ss-gradient)';
+const RADIUS = 'var(--ss-radius)';
 
 const FEATURES = [
   { num: '01', title: 'Multi-Agent Pipeline', desc: '13 specialized agents research, structure, and fact-check every slide in sequence.' },
@@ -44,10 +46,10 @@ export default function LandingPage() {
         position: 'sticky', top: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 48px', height: 56,
-        background: scrolled ? 'rgba(13,13,13,0.95)' : BG,
-        borderBottom: `1px solid ${scrolled ? '#2A2A2A' : BORDER}`,
+        background: scrolled ? 'rgba(18,19,21,0.92)' : BG,
+        borderBottom: `1px solid ${scrolled ? 'rgba(255,255,255,0.12)' : BORDER}`,
         backdropFilter: scrolled ? 'blur(12px)' : 'none',
-        transition: 'background 0.2s, border-color 0.2s',
+        transition: 'background 0.2s, border-color 0.2s, backdrop-filter 0.2s',
       }}>
         <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
           SlideSmith
@@ -55,11 +57,11 @@ export default function LandingPage() {
         <Link href="/studio-new" style={{ textDecoration: 'none' }}>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: LIME, color: '#0D0D0D',
+            background: GRADIENT, color: '#fff',
             padding: '8px 18px',
             fontSize: 11, fontWeight: 800,
-            letterSpacing: '0.12em', textTransform: 'uppercase',
-            cursor: 'pointer',
+            letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+            cursor: 'pointer', borderRadius: RADIUS,
           }}>
             Open Studio →
           </span>
@@ -82,13 +84,13 @@ export default function LandingPage() {
         }}>
           Build decks<br />
           that actually<br />
-          <span style={{ color: LIME }}>say something.</span>
+          <span style={{ color: CYAN }}>say something.</span>
         </h1>
 
         <p style={{
           fontSize: 16, color: '#777', lineHeight: 1.8,
           maxWidth: 480, marginBottom: 40,
-          borderLeft: `2px solid ${LIME}`, paddingLeft: 20,
+          borderLeft: `2px solid ${CYAN}`, paddingLeft: 20,
         }}>
           Turn any topic into a structured, chart-rich, visually complete
           presentation in minutes. Multi-agent AI pipeline. Groq or Ollama.
@@ -100,11 +102,11 @@ export default function LandingPage() {
           <Link href="/studio-new" style={{ textDecoration: 'none' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
-              background: LIME, color: '#0D0D0D',
+              background: GRADIENT, color: '#fff',
               padding: '16px 32px',
               fontSize: 13, fontWeight: 800,
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-              cursor: 'pointer',
+              letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+              cursor: 'pointer', borderRadius: RADIUS,
             }}>
               Start Creating →
             </span>
@@ -112,11 +114,11 @@ export default function LandingPage() {
           <a href="#how-it-works" style={{ textDecoration: 'none' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
-              border: `1px solid #333`, color: '#888',
+              border: `1px solid ${BORDER}`, color: MUTED,
               padding: '16px 32px',
               fontSize: 13, fontWeight: 700,
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-              cursor: 'pointer',
+              letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+              cursor: 'pointer', borderRadius: RADIUS,
             }}>
               How it works ↓
             </span>
@@ -136,10 +138,14 @@ export default function LandingPage() {
         </div>
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 1, background: BORDER, maxWidth: 960,
+          gap: 8, maxWidth: 960,
         }}>
           {STEPS.map(s => (
-            <div key={s.n} style={{ background: BG, padding: '28px 24px' }}>
+            <div key={s.n} style={{
+              background: 'var(--ss-surface-card)',
+              padding: '28px 24px',
+              borderRadius: RADIUS,
+            }}>
               <div style={{
                 fontSize: 28, fontWeight: 800, color: '#2A2A2A',
                 letterSpacing: '-0.02em', marginBottom: 12,
@@ -160,11 +166,11 @@ export default function LandingPage() {
           <Link href="/studio-new" style={{ textDecoration: 'none' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
-              border: `1px solid ${LIME}`, color: LIME,
+              border: `1px solid ${BORDER}`, color: CYAN,
               padding: '13px 26px',
               fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-              cursor: 'pointer',
+              letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+              cursor: 'pointer', borderRadius: RADIUS,
             }}>
               Try it now →
             </span>
@@ -202,7 +208,7 @@ export default function LandingPage() {
             >
               <span style={{
                 fontSize: 10, fontWeight: 700,
-                color: hoveredFeature === i ? LIME : '#333',
+                color: hoveredFeature === i ? CYAN : '#333',
                 letterSpacing: '0.1em', paddingTop: 3, flexShrink: 0,
                 transition: 'color 0.15s',
               }}>
@@ -241,11 +247,11 @@ export default function LandingPage() {
           <Link href="/studio-new" style={{ textDecoration: 'none' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
-              background: LIME, color: '#0D0D0D',
+              background: GRADIENT, color: '#fff',
               padding: '18px 36px',
               fontSize: 13, fontWeight: 800,
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-              cursor: 'pointer',
+              letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+              cursor: 'pointer', borderRadius: RADIUS,
             }}>
               Open Studio →
             </span>
