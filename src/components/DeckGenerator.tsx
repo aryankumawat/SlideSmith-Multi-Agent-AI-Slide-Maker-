@@ -13,7 +13,6 @@ interface DeckGeneratorProps {
 
 const SYNE = 'var(--font-syne), Syne, sans-serif';
 const MONO = 'var(--font-geist-mono), monospace';
-const LIME = '#C8FF00';
 
 const THEMES = [
   { value: 'academic',     label: 'Academic' },
@@ -99,62 +98,17 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
 
   return (
     <div style={{
-      minHeight: '100dvh',
-      background: '#0A0A0A',
-      color: '#F0EEE8',
-      fontFamily: SYNE,
-      display: 'flex',
-      flexDirection: 'column',
+      flex: 1,
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      maxWidth: 1280,
+      width: '100%',
+      margin: '0 auto',
+      padding: '72px 40px 40px',
+      gap: 80,
+      alignItems: 'start',
+      boxSizing: 'border-box' as const,
     }}>
-      {/* Nav */}
-      <motion.nav
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: EASE }}
-        style={{
-          height: 52,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 40px',
-          borderBottom: '1px solid #161616',
-          flexShrink: 0,
-        }}
-      >
-        <span style={{
-          fontSize: 13,
-          fontWeight: 800,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: '#F0EEE8',
-        }}>
-          SlideSmith
-        </span>
-        <span style={{
-          fontSize: 11,
-          color: '#383838',
-          fontFamily: MONO,
-          letterSpacing: '0.08em',
-        }}>
-          AI Presentation Builder
-        </span>
-      </motion.nav>
-
-      {/* Main */}
-      <div style={{
-        flex: 1,
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        maxWidth: 1280,
-        width: '100%',
-        margin: '0 auto',
-        padding: '0 40px',
-        gap: 80,
-        alignItems: 'start',
-        paddingTop: 72,
-        paddingBottom: 40,
-        boxSizing: 'border-box',
-      }}>
 
         {/* Left: Hero copy */}
         <motion.div
@@ -174,8 +128,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
           }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%',
-              background: LIME,
-              boxShadow: `0 0 8px ${LIME}`,
+              background: 'var(--ss-cyan)',
+              boxShadow: '0 0 8px var(--ss-cyan)',
               flexShrink: 0,
             }} />
             <span style={{ fontSize: 10, fontFamily: MONO, color: '#555', letterSpacing: '0.1em' }}>
@@ -189,7 +143,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
             lineHeight: 1.05,
             letterSpacing: '-0.03em',
             margin: '0 0 20px',
-            color: '#F0EEE8',
+            color: 'var(--ss-text)',
           }}>
             Turn any idea into a presentation.
           </motion.h1>
@@ -213,7 +167,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               {EXAMPLE_PROMPTS.map((p, i) => (
                 <motion.button
                   key={i}
-                  whileHover={{ x: 4, color: '#F0EEE8' }}
+                  whileHover={{ x: 4, color: 'var(--ss-text)' }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   onClick={() => usePrompt(p)}
@@ -226,7 +180,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                     fontSize: 13,
                     color: '#404040',
                     fontFamily: SYNE,
-                    borderBottom: '1px solid #161616',
+                    borderBottom: '1px solid var(--ss-border)',
                     transition: 'color 0.15s',
                     display: 'flex',
                     alignItems: 'center',
@@ -255,8 +209,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               <motion.div
                 animate={{
                   boxShadow: focused
-                    ? `0 0 0 1px ${LIME}40, 0 0 24px ${LIME}10`
-                    : '0 0 0 1px #1C1C1C',
+                    ? '0 0 0 1px rgba(0,212,255,0.4), 0 0 24px rgba(0,212,255,0.1)'
+                    : '0 0 0 1px rgba(255,255,255,0.08)',
                 }}
                 transition={{ duration: 0.2 }}
                 style={{ borderRadius: 8, overflow: 'hidden' }}
@@ -272,10 +226,10 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                   style={{
                     width: '100%',
                     minHeight: 180,
-                    background: '#0F0F0F',
+                    background: 'var(--ss-surface-card)',
                     border: 'none',
                     outline: 'none',
-                    color: '#F0EEE8',
+                    color: 'var(--ss-text)',
                     fontSize: 14,
                     lineHeight: 1.7,
                     padding: '18px 20px',
@@ -317,8 +271,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               {/* Slide count */}
               <div style={{
                 padding: '12px 16px',
-                background: '#0F0F0F',
-                border: '1px solid #1C1C1C',
+                background: 'var(--ss-surface-card)',
+                border: '1px solid var(--ss-border)',
                 borderRadius: 8,
                 display: 'flex',
                 alignItems: 'center',
@@ -330,14 +284,14 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                     type="button"
                     onClick={() => set('slide_count', Math.max(4, form.slide_count - 1))}
                     style={{
-                      width: 24, height: 24, background: '#161616', border: '1px solid #222',
-                      color: '#555', cursor: 'pointer', fontSize: 14, borderRadius: 4,
+                      width: 24, height: 24, background: 'var(--ss-surface-high)', border: '1px solid var(--ss-border)',
+                      color: 'var(--ss-text-secondary)', cursor: 'pointer', fontSize: 14, borderRadius: 4,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontFamily: SYNE,
                     }}
                   >-</button>
                   <span style={{
-                    fontSize: 18, fontWeight: 800, color: '#F0EEE8',
+                    fontSize: 18, fontWeight: 800, color: 'var(--ss-text)',
                     fontVariantNumeric: 'tabular-nums', minWidth: 28, textAlign: 'center',
                   }}>
                     {form.slide_count}
@@ -346,8 +300,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                     type="button"
                     onClick={() => set('slide_count', Math.min(30, form.slide_count + 1))}
                     style={{
-                      width: 24, height: 24, background: '#161616', border: '1px solid #222',
-                      color: '#555', cursor: 'pointer', fontSize: 14, borderRadius: 4,
+                      width: 24, height: 24, background: 'var(--ss-surface-high)', border: '1px solid var(--ss-border)',
+                      color: 'var(--ss-text-secondary)', cursor: 'pointer', fontSize: 14, borderRadius: 4,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontFamily: SYNE,
                     }}
@@ -358,8 +312,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               {/* Theme */}
               <div style={{
                 padding: '12px 16px',
-                background: '#0F0F0F',
-                border: '1px solid #1C1C1C',
+                background: 'var(--ss-surface-card)',
+                border: '1px solid var(--ss-border)',
                 borderRadius: 8,
                 position: 'relative',
               }}>
@@ -371,7 +325,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                   onChange={e => set('theme', e.target.value)}
                   style={{
                     background: 'none', border: 'none', outline: 'none',
-                    color: '#F0EEE8', fontSize: 13, fontWeight: 600,
+                    color: 'var(--ss-text)', fontSize: 13, fontWeight: 600,
                     fontFamily: SYNE, cursor: 'pointer', width: '100%',
                     appearance: 'none', WebkitAppearance: 'none',
                   }}
@@ -386,8 +340,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               {/* Tone */}
               <div style={{
                 padding: '12px 16px',
-                background: '#0F0F0F',
-                border: '1px solid #1C1C1C',
+                background: 'var(--ss-surface-card)',
+                border: '1px solid var(--ss-border)',
                 borderRadius: 8,
                 position: 'relative',
               }}>
@@ -399,7 +353,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                   onChange={e => set('tone', e.target.value)}
                   style={{
                     background: 'none', border: 'none', outline: 'none',
-                    color: '#F0EEE8', fontSize: 13, fontWeight: 600,
+                    color: 'var(--ss-text)', fontSize: 13, fontWeight: 600,
                     fontFamily: SYNE, cursor: 'pointer', width: '100%',
                     appearance: 'none', WebkitAppearance: 'none',
                   }}
@@ -414,8 +368,8 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               {/* Audience */}
               <div style={{
                 padding: '12px 16px',
-                background: '#0F0F0F',
-                border: '1px solid #1C1C1C',
+                background: 'var(--ss-surface-card)',
+                border: '1px solid var(--ss-border)',
                 borderRadius: 8,
                 position: 'relative',
               }}>
@@ -427,7 +381,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                   onChange={e => set('audience', e.target.value)}
                   style={{
                     background: 'none', border: 'none', outline: 'none',
-                    color: '#F0EEE8', fontSize: 13, fontWeight: 600,
+                    color: 'var(--ss-text)', fontSize: 13, fontWeight: 600,
                     fontFamily: SYNE, cursor: 'pointer', width: '100%',
                     appearance: 'none', WebkitAppearance: 'none',
                   }}
@@ -454,13 +408,15 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                     onClick={() => set('text_density', opt.value)}
                     style={{
                       padding: '12px 10px',
-                      background: form.text_density === opt.value ? LIME : '#0F0F0F',
-                      border: `1px solid ${form.text_density === opt.value ? LIME : '#1C1C1C'}`,
-                      color: form.text_density === opt.value ? '#0A0A0A' : '#404040',
+                      background: form.text_density === opt.value
+                        ? 'linear-gradient(135deg, rgba(0,212,255,0.12), rgba(124,58,237,0.12))'
+                        : 'var(--ss-surface-card)',
+                      border: `1px solid ${form.text_density === opt.value ? 'var(--ss-cyan)' : 'var(--ss-border)'}`,
+                      color: form.text_density === opt.value ? 'var(--ss-cyan)' : 'var(--ss-text-secondary)',
                       cursor: 'pointer',
-                      textAlign: 'left',
+                      textAlign: 'left' as const,
                       fontFamily: SYNE,
-                      borderRadius: 8,
+                      borderRadius: 'var(--ss-radius)',
                       transition: 'all 0.15s cubic-bezier(0.32, 0.72, 0, 1)',
                     }}
                   >
@@ -481,13 +437,15 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                     onClick={() => set('content_format', opt.value)}
                     style={{
                       padding: '12px 10px',
-                      background: form.content_format === opt.value ? LIME : '#0F0F0F',
-                      border: `1px solid ${form.content_format === opt.value ? LIME : '#1C1C1C'}`,
-                      color: form.content_format === opt.value ? '#0A0A0A' : '#404040',
+                      background: form.content_format === opt.value
+                        ? 'linear-gradient(135deg, rgba(0,212,255,0.12), rgba(124,58,237,0.12))'
+                        : 'var(--ss-surface-card)',
+                      border: `1px solid ${form.content_format === opt.value ? 'var(--ss-cyan)' : 'var(--ss-border)'}`,
+                      color: form.content_format === opt.value ? 'var(--ss-cyan)' : 'var(--ss-text-secondary)',
                       cursor: 'pointer',
-                      textAlign: 'left',
+                      textAlign: 'left' as const,
                       fontFamily: SYNE,
-                      borderRadius: 8,
+                      borderRadius: 'var(--ss-radius)',
                       transition: 'all 0.15s cubic-bezier(0.32, 0.72, 0, 1)',
                     }}
                   >
@@ -508,14 +466,14 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
               style={{
                 width: '100%',
                 padding: '18px 24px',
-                background: canSubmit ? LIME : '#141414',
-                border: `1px solid ${canSubmit ? LIME : '#2A2A2A'}`,
-                borderRadius: 8,
-                color: canSubmit ? '#0A0A0A' : '#3A3A3A',
+                background: canSubmit ? 'var(--ss-gradient)' : 'var(--ss-surface-card)',
+                border: canSubmit ? 'none' : '1px solid var(--ss-border)',
+                borderRadius: 'var(--ss-radius)',
+                color: canSubmit ? '#fff' : 'var(--ss-text-secondary)',
                 fontSize: 13,
                 fontWeight: 800,
                 letterSpacing: '0.12em',
-                textTransform: 'uppercase',
+                textTransform: 'uppercase' as const,
                 cursor: canSubmit ? 'pointer' : 'not-allowed',
                 fontFamily: SYNE,
                 display: 'flex',
@@ -523,7 +481,7 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
                 justifyContent: 'center',
                 gap: 10,
                 transition: 'background 0.2s, color 0.2s',
-                boxShadow: canSubmit ? `0 0 24px ${LIME}25` : 'none',
+                boxShadow: canSubmit ? '0 0 24px rgba(0,212,255,0.15)' : 'none',
               }}
             >
               {isLoading ? (
@@ -555,7 +513,6 @@ export default function DeckGenerator({ onGenerate, isLoading = false }: DeckGen
             </p>
           </form>
         </motion.div>
-      </div>
     </div>
   );
 }
