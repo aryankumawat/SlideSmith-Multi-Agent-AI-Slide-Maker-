@@ -179,6 +179,28 @@
 
 /* Theme-specific styles */
 @layer components {
+  /* === Stitch Utility Classes === */
+  .accent-gradient-text {
+    background: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .accent-gradient-bg {
+    background: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+  }
+
+  .glass-panel {
+    backdrop-filter: blur(12px);
+    background: rgba(23, 24, 28, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+  }
+
   .particle-background {
     position: relative;
     overflow: hidden;
