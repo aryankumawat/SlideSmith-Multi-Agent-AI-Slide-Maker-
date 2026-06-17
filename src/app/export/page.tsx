@@ -94,7 +94,7 @@ export default function ExportPage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = `${strip(deck.title)}.json`; a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
         return;
       }
       const endpoint = format === 'pptx' ? '/api/export/pptx' : '/api/export/pdf';
